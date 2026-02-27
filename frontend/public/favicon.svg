@@ -1,0 +1,29 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="fg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6c63ff"/>
+      <stop offset="100%" stop-color="#00d4ff"/>
+    </linearGradient>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#14161e"/>
+      <stop offset="100%" stop-color="#08090b"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="32" cy="32" r="32" fill="url(#bg)"/>
+  <circle cx="32" cy="32" r="30" stroke="url(#fg)" stroke-width="1.5" fill="none" opacity="0.4"/>
+
+  <!-- Waveform bars -->
+  <rect x="17" y="28" width="3" height="8"  rx="1.5" fill="url(#fg)"/>
+  <rect x="22" y="25" width="3" height="14" rx="1.5" fill="url(#fg)"/>
+  <rect x="27" y="21" width="3" height="22" rx="1.5" fill="url(#fg)"/>
+  <rect x="32" y="18" width="3" height="28" rx="1.5" fill="url(#fg)"/>
+  <rect x="37" y="21" width="3" height="22" rx="1.5" fill="url(#fg)"/>
+  <rect x="42" y="25" width="3" height="14" rx="1.5" fill="url(#fg)"/>
+
+  <!-- Eighth note accent -->
+  <ellipse cx="49" cy="15" rx="3" ry="2.2" fill="url(#fg)" transform="rotate(-20 49 15)" opacity="0.8"/>
+  <line x1="51.5" y1="14" x2="51.5" y2="7" stroke="url(#fg)" stroke-width="1.5" stroke-linecap="round" opacity="0.8"/>
+  <path d="M51.5 7 Q54 9 52.5 11" stroke="url(#fg)" stroke-width="1.3" stroke-linecap="round" fill="none" opacity="0.8"/>
+</svg>

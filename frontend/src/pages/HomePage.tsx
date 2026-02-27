@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Music, Sparkles, Keyboard, Waves, Cpu, Trash2 } from 'lucide-react'
+import { Plus, Sparkles, Keyboard, Waves, Cpu, Trash2 } from 'lucide-react'
 import { Button } from '@/components/common/Button'
 import { LEDIndicator } from '@/components/common/LEDIndicator'
+import { LogoIcon } from '@/components/common/LogoIcon'
 import { projectsApi } from '@/services/apiClient'
 
 interface ProjectSummary {
@@ -69,16 +70,7 @@ function GradientMesh() {
 function ShimmerLogo() {
   return (
     <div className="relative inline-flex items-center gap-3">
-      <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center"
-        style={{
-          background: 'linear-gradient(135deg, rgba(108,99,255,0.2) 0%, rgba(108,99,255,0.05) 100%)',
-          border: '1px solid rgba(108, 99, 255, 0.2)',
-          boxShadow: '0 0 20px rgba(108, 99, 255, 0.15), inset 0 1px 0 rgba(255,255,255,0.05)',
-        }}
-      >
-        <Music size={20} className="text-accent" style={{ filter: 'drop-shadow(0 0 6px rgba(108,99,255,0.6))' }} />
-      </div>
+      <LogoIcon size={44} color="#6c63ff" glow glowColor="rgba(108,99,255,0.5)" />
       <div>
         <h1
           className="text-xl font-bold font-lcd text-transparent bg-clip-text tracking-wider"

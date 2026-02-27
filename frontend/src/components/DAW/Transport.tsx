@@ -10,6 +10,7 @@ import { useDAWStore } from '@/store/dawStore'
 import { useAudioEngine } from '@/hooks/useAudioEngine'
 import { MIDIStatus } from './MIDIStatus'
 import { LEDIndicator } from '@/components/common/LEDIndicator'
+import { LogoIcon } from '@/components/common/LogoIcon'
 import { VUMeter, useSimulatedLevel } from '@/components/common/VUMeter'
 import { useLibraryStore } from '@/store/libraryStore'
 
@@ -139,12 +140,9 @@ export function Transport() {
 
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 select-none transport-bar scan-line-overlay">
-      {/* Logo + power LED */}
-      <div className="flex items-center gap-2 mr-1">
-        <LEDIndicator on color="accent" size="xs" />
-        <span className="text-sm font-bold font-lcd text-gradient-accent tracking-tight">
-          LLM-DAW
-        </span>
+      {/* Logo */}
+      <div className="flex items-center gap-1.5 mr-1">
+        <LogoIcon size={28} color="#6c63ff" glow glowColor="rgba(108,99,255,0.4)" />
       </div>
 
       {/* Hardware groove */}
