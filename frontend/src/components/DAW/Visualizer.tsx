@@ -14,6 +14,21 @@ const PARTICLE_COUNT = 50
 const BAR_COUNT = 64
 const NOTE_FADE_MS = 400
 
+// ─── Keyboard constants ─────────────────────────────────────────────────────
+const KB_OCTAVES = 2
+const KB_WHITE_COUNT = 7 * KB_OCTAVES          // 14 white keys
+const KB_DEFAULT_BASE = 48                       // C3
+const KB_WIDTH_RATIO = 0.55                      // keyboard occupies 55% of canvas width
+const KB_HEIGHT_RATIO = 0.16                     // 16% of canvas height
+const KB_BLACK_WIDTH_RATIO = 0.6                 // black key is 60% width of white
+const KB_BLACK_HEIGHT_RATIO = 0.62               // black key is 62% height of white
+const KB_BOTTOM_PAD = 12                         // px from canvas bottom
+
+// White key index within an octave for each chromatic note (–1 = black key)
+const CHROMATIC_TO_WHITE: number[] = [0, -1, 1, -1, 2, 3, -1, 4, -1, 5, -1, 6]
+// Black key offset from the left edge of its preceding white key (fraction of white key width)
+const BLACK_KEY_OFFSETS: Record<number, number> = { 1: 0.65, 3: 0.65, 6: 0.65, 8: 0.65, 10: 0.65 }
+
 // ─── Pre-generate stable random colors for each bar ──────────────────────────
 
 const PALETTE = [
@@ -239,6 +254,177 @@ function drawGlowText(
   ctx.globalAlpha = 1
 }
 
+// ─── Draw mini keyboard ──────────────────────────────────────────────────────
+
+function computeKeyboardBase(
+  activeNotes: Map<number, ActiveNote>,
+  fadingNotes: FadingNote[],
+  lastBase: number,
+): number {
+  // Collect all visible pitches
+  const pitches: number[] = []
+  for (const [p] of activeNotes) pitches.push(p)
+  for (const f of fadingNotes) pitches.push(f.pitch)
+  if (pitches.length === 0) return lastBase
+
+  // Find the lowest pitch and snap to octave start (C)
+  const lowest = Math.min(...pitches)
+  const octave = Math.floor(lowest / 12)
+  const base = octave * 12
+  // Clamp to reasonable MIDI range
+  return Math.max(24, Math.min(96, base))
+}
+
+function drawKeyboard(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  now: number,
+  activeNotes: Map<number, ActiveNote>,
+  fadingNotes: FadingNote[],
+  base: number,
+) {
+  const totalW = w * KB_WIDTH_RATIO
+  const totalH = h * KB_HEIGHT_RATIO
+  const startX = (w - totalW) / 2
+  const startY = h - totalH - KB_BOTTOM_PAD
+  const whiteW = totalW / KB_WHITE_COUNT
+  const whiteH = totalH
+  const blackW = whiteW * KB_BLACK_WIDTH_RATIO
+  const blackH = whiteH * KB_BLACK_HEIGHT_RATIO
+  const radius = 3
+
+  // Build a map of pitch → { color, alpha } for all visible notes
+  const noteState = new Map<number, { color: string; alpha: number; velocity: number }>()
+  for (const [pitch, note] of activeNotes) {
+    const age = now - note.startTime
+    const alpha = Math.min(1, age / 50)
+    noteState.set(pitch, { color: note.color, alpha, velocity: note.velocity })
+  }
+  for (const fn of fadingNotes) {
+    const elapsed = now - fn.fadeStart
+    const alpha = Math.max(0, 1 - elapsed / NOTE_FADE_MS)
+    if (alpha > 0 && !noteState.has(fn.pitch)) {
+      noteState.set(fn.pitch, { color: fn.color, alpha, velocity: fn.velocity })
+    }
+  }
+
+  // ── Draw white keys ────────────────────────────────────────────────
+  let whiteIdx = 0
+  for (let oct = 0; oct < KB_OCTAVES; oct++) {
+    for (let note = 0; note < 12; note++) {
+      const wi = CHROMATIC_TO_WHITE[note]
+      if (wi === -1) continue // skip black keys
+
+      const midi = base + oct * 12 + note
+      const kx = startX + whiteIdx * whiteW
+      const state = noteState.get(midi)
+
+      // Key body
+      ctx.beginPath()
+      ctx.roundRect(kx + 1, startY, whiteW - 2, whiteH, [0, 0, radius, radius])
+
+      if (state) {
+        // Active/fading — glow fill
+        const velBright = 0.4 + (state.velocity / 127) * 0.6
+        ctx.save()
+        ctx.shadowColor = state.color
+        ctx.shadowBlur = 14
+        ctx.globalAlpha = state.alpha * velBright * 0.5
+        ctx.fillStyle = state.color
+        ctx.fill()
+        ctx.restore()
+
+        // Solid color fill
+        ctx.globalAlpha = state.alpha * velBright * 0.7
+        ctx.fillStyle = state.color
+        ctx.fill()
+
+        // Note label
+        ctx.globalAlpha = state.alpha * 0.9
+        ctx.fillStyle = '#ffffff'
+        ctx.font = '10px "Share Tech Mono", monospace'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'bottom'
+        ctx.fillText(midiToNoteName(midi), kx + whiteW / 2, startY + whiteH - 4)
+      } else {
+        // Inactive white key — dark translucent
+        ctx.globalAlpha = 0.12
+        ctx.fillStyle = '#ffffff'
+        ctx.fill()
+      }
+
+      // Border
+      ctx.globalAlpha = 0.15
+      ctx.strokeStyle = '#ffffff'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.roundRect(kx + 1, startY, whiteW - 2, whiteH, [0, 0, radius, radius])
+      ctx.stroke()
+
+      ctx.globalAlpha = 1
+      whiteIdx++
+    }
+  }
+
+  // ── Draw black keys (on top) ───────────────────────────────────────
+  whiteIdx = 0
+  for (let oct = 0; oct < KB_OCTAVES; oct++) {
+    for (let note = 0; note < 12; note++) {
+      const wi = CHROMATIC_TO_WHITE[note]
+      if (wi === -1) continue
+
+      // Check if next chromatic note is a black key
+      const blackNote = note + 1
+      if (blackNote < 12 && BLACK_KEY_OFFSETS[blackNote] !== undefined) {
+        const midi = base + oct * 12 + blackNote
+        const kx = startX + whiteIdx * whiteW + whiteW * BLACK_KEY_OFFSETS[blackNote] - blackW / 2
+        const state = noteState.get(midi)
+
+        ctx.beginPath()
+        ctx.roundRect(kx, startY, blackW, blackH, [0, 0, radius, radius])
+
+        if (state) {
+          const velBright = 0.4 + (state.velocity / 127) * 0.6
+
+          // Glow
+          ctx.save()
+          ctx.shadowColor = state.color
+          ctx.shadowBlur = 12
+          ctx.globalAlpha = state.alpha * velBright * 0.6
+          ctx.fillStyle = state.color
+          ctx.fill()
+          ctx.restore()
+
+          // Solid fill
+          ctx.globalAlpha = state.alpha * velBright * 0.8
+          ctx.fillStyle = state.color
+          ctx.fill()
+        } else {
+          // Inactive black key — darker
+          ctx.globalAlpha = 0.25
+          ctx.fillStyle = '#0a0a0f'
+          ctx.fill()
+
+          // Subtle highlight edge
+          ctx.globalAlpha = 0.08
+          ctx.strokeStyle = '#ffffff'
+          ctx.lineWidth = 1
+          ctx.stroke()
+        }
+
+        ctx.globalAlpha = 1
+      }
+
+      whiteIdx++
+    }
+  }
+
+  ctx.globalAlpha = 1
+  ctx.textAlign = 'start'
+  ctx.textBaseline = 'alphabetic'
+}
+
 // ─── Visualizer Component ─────────────────────────────────────────────────────
 
 export function Visualizer() {
@@ -254,6 +440,7 @@ export function Visualizer() {
   // Note tracking refs (no re-renders)
   const activeNotesRef = useRef<Map<number, ActiveNote>>(new Map())
   const fadingNotesRef = useRef<FadingNote[]>([])
+  const kbBaseRef = useRef(KB_DEFAULT_BASE)
 
   // Subscribe to MIDI note on/off events
   useEffect(() => {
@@ -420,6 +607,12 @@ export function Visualizer() {
       )
 
       drawNoteOverlay(ctx, w, h, now, activeNotesRef.current, fadingNotesRef.current)
+
+      // ── Mini keyboard ───────────────────────────────────────────────
+      kbBaseRef.current = computeKeyboardBase(
+        activeNotesRef.current, fadingNotesRef.current, kbBaseRef.current,
+      )
+      drawKeyboard(ctx, w, h, now, activeNotesRef.current, fadingNotesRef.current, kbBaseRef.current)
 
       // ── CRT overlay: scan-lines + vignette ────────────────────────────
       scanLineOffset.current = (scanLineOffset.current + 0.3) % 4
