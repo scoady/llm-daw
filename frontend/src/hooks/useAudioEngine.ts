@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useMemo } from 'react'
 import { useDAWStore } from '@/store/dawStore'
 import { audioEngine } from '@/services/audioEngine'
 
@@ -22,6 +22,20 @@ export function useAudioEngine() {
   useEffect(() => {
     audioEngine.setBpm(bpm)
   }, [bpm])
+
+  // Sync instrument presets to audio engine when they change
+  const presetKey = useMemo(
+    () => tracks.map((t) => `${t.id}:${t.instrument?.presetId ?? ''}`).join(','),
+    [tracks]
+  )
+
+  useEffect(() => {
+    for (const track of tracks) {
+      if ((track.type === 'midi' || track.type === 'instrument') && track.instrument?.presetId) {
+        audioEngine.setTrackInstrument(track.id, track.instrument.presetId, track.type)
+      }
+    }
+  }, [presetKey])
 
   // Schedule tracks when playback starts (not on every track mutation)
   useEffect(() => {

@@ -41,7 +41,8 @@ export interface Track {
 }
 
 export interface InstrumentSettings {
-  type: 'synth' | 'am-synth' | 'fm-synth' | 'membrane' | 'metal' | 'sampler'
+  presetId: string
+  type?: 'synth' | 'am-synth' | 'fm-synth' | 'membrane' | 'metal' | 'sampler'
   options?: Record<string, unknown>
 }
 

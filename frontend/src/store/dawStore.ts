@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import type { Track, Clip, Note, TransportState, TrackType, MIDIDeviceInfo, Project } from '@/types'
 import { projectsApi } from '@/services/apiClient'
+import { DEFAULT_PRESET_ID, migratePresetId } from '@/data/instrumentPresets'
 
 const TRACK_COLORS = [
   '#6c63ff', '#22c55e', '#f59e0b', '#ef4444',
@@ -72,6 +73,7 @@ interface DAWActions {
   updateTrack(id: string, patch: Partial<Track>): void
   selectTrack(id: string | null): void
   reorderTracks(fromIndex: number, toIndex: number): void
+  setTrackInstrument(trackId: string, presetId: string): void
 
   // Clips
   addClip(trackId: string, startBeat: number, durationBeats?: number): Clip
@@ -189,7 +191,7 @@ export const useDAWStore = create<DAWState & DAWActions>()(
         solo: false,
         armed: false,
         instrument: type === 'midi' || type === 'instrument'
-          ? { type: 'synth' }
+          ? { presetId: DEFAULT_PRESET_ID }
           : undefined,
       }
       set((s) => { s.tracks.push(track) })
@@ -211,6 +213,14 @@ export const useDAWStore = create<DAWState & DAWActions>()(
     reorderTracks: (from, to) => set((s) => {
       const [removed] = s.tracks.splice(from, 1)
       s.tracks.splice(to, 0, removed)
+    }),
+
+    setTrackInstrument: (trackId, presetId) => set((s) => {
+      const t = s.tracks.find((t) => t.id === trackId)
+      if (t) {
+        if (!t.instrument) t.instrument = { presetId }
+        else t.instrument.presetId = presetId
+      }
     }),
 
     // ── Clips
@@ -416,7 +426,14 @@ export const useDAWStore = create<DAWState & DAWActions>()(
           s.projectName = project.name
           s.bpm = project.bpm
           s.timeSignature = project.timeSignature ?? [4, 4]
-          s.tracks = project.tracks ?? []
+          s.tracks = (project.tracks ?? []).map((t) => ({
+            ...t,
+            instrument: t.instrument
+              ? { ...t.instrument, presetId: migratePresetId(t.instrument) }
+              : (t.type === 'midi' || t.type === 'instrument')
+                ? { presetId: DEFAULT_PRESET_ID }
+                : undefined,
+          }))
           s.selectedTrackId = null
           s.selectedClipId = null
           s.saveStatus = 'saved'

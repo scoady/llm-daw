@@ -8,7 +8,8 @@ import { clsx } from 'clsx'
 import { useDAWStore, selectClipById } from '@/store/dawStore'
 import { useAIStore } from '@/store/aiStore'
 import { aiClient } from '@/services/apiClient'
-import { audioEngine } from '@/services/audioEngine'
+import { audioEngine, createSynthFromPreset } from '@/services/audioEngine'
+import { getPreset, DEFAULT_PRESET_ID } from '@/data/instrumentPresets'
 import { midiToNoteName, isBlackKey } from '@/services/midiService'
 import { Button } from '@/components/common/Button'
 import { LEDIndicator } from '@/components/common/LEDIndicator'
@@ -217,10 +218,16 @@ function MiniNotePreview({ notes, height = 48 }: { notes: Note[]; height?: numbe
 // ─── Suggestion Card ────────────────────────────────────────────────────────
 
 function SuggestionCard({ suggestion, index }: { suggestion: Suggestion; index: number }) {
-  const { bpm, addTrack, addClip, addNote } = useDAWStore()
+  const { bpm, tracks, selectedTrackId, addTrack, addClip, addNote } = useDAWStore()
   const { previewingSuggestionId, setPreviewingSuggestionId } = useAIStore()
   const isPreviewing = previewingSuggestionId === suggestion.id
-  const previewSynthRef = useRef<Tone.PolySynth | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const previewSynthRef = useRef<any>(null)
+
+  // Get preset from selected track (or first MIDI track)
+  const previewTrack = tracks.find((t) => t.id === selectedTrackId && (t.type === 'midi' || t.type === 'instrument'))
+    ?? tracks.find((t) => t.type === 'midi' || t.type === 'instrument')
+  const trackPresetId = previewTrack?.instrument?.presetId
 
   const typeConfig: Record<string, { color: string; glowColor: string; bgColor: string }> = {
     continuation: { color: '#39ff14', glowColor: 'rgba(57, 255, 20, 0.3)', bgColor: 'rgba(57, 255, 20, 0.08)' },
@@ -251,18 +258,16 @@ function SuggestionCard({ suggestion, index }: { suggestion: Suggestion; index: 
     await audioEngine.init()
     setPreviewingSuggestionId(suggestion.id)
 
-    const synth = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: 'triangle' },
-      envelope: { attack: 0.02, decay: 0.1, sustain: 0.5, release: 0.8 },
-    }).toDestination()
-    previewSynthRef.current = synth
+    // Use the selected track's instrument preset for preview
+    const preset = getPreset(trackPresetId ?? DEFAULT_PRESET_ID)
+    const synthAdapter = createSynthFromPreset(preset).connect(Tone.getDestination())
 
     // Schedule directly on audio context (not Transport) so preview works
     // regardless of transport state
     const secPerBeat = 60 / bpm
     const now = Tone.now() + 0.05
     for (const note of suggestion.notes) {
-      synth.triggerAttackRelease(
+      synthAdapter.triggerAttackRelease(
         Tone.Frequency(note.pitch, 'midi').toNote(),
         note.durationBeats * secPerBeat,
         now + note.startBeat * secPerBeat,
@@ -272,11 +277,11 @@ function SuggestionCard({ suggestion, index }: { suggestion: Suggestion; index: 
 
     const totalDuration = suggestion.durationBeats * secPerBeat
     setTimeout(() => {
-      synth.dispose()
+      synthAdapter.dispose()
       previewSynthRef.current = null
       setPreviewingSuggestionId(null)
     }, totalDuration * 1000 + 500)
-  }, [isPreviewing, suggestion, bpm, setPreviewingSuggestionId])
+  }, [isPreviewing, suggestion, bpm, trackPresetId, setPreviewingSuggestionId])
 
   const handleAddToTrack = useCallback(() => {
     // Always create a new track at beat 0

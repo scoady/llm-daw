@@ -4,6 +4,7 @@ import { useDAWStore } from '@/store/dawStore'
 import { Slider } from '@/components/common/Slider'
 import { LEDIndicator } from '@/components/common/LEDIndicator'
 import { VUMeter, useSimulatedLevel } from '@/components/common/VUMeter'
+import { InstrumentSelector } from './InstrumentSelector'
 import type { Track } from '@/types'
 
 const TRACK_HEIGHT = 64
@@ -79,10 +80,14 @@ export function TrackHeader({ track, selected, onClick, index }: TrackHeaderProp
           <span className="text-xs font-medium text-text-primary truncate">{track.name}</span>
         </div>
 
-        {/* I/O label */}
-        <div className="text-2xs text-text-muted font-lcd tracking-wider">
-          {isMidi ? 'MIDI IN' : 'AUDIO'}
-        </div>
+        {/* Instrument selector or I/O label */}
+        {isMidi && track.instrument?.presetId ? (
+          <InstrumentSelector trackId={track.id} presetId={track.instrument.presetId} />
+        ) : (
+          <div className="text-2xs text-text-muted font-lcd tracking-wider">
+            {isMidi ? 'MIDI IN' : 'AUDIO'}
+          </div>
+        )}
 
         {/* Volume slider + VU meter */}
         <div className="flex items-center gap-1.5">

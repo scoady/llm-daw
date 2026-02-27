@@ -62,8 +62,8 @@ export function useMIDIInput() {
 
       if (!targetTrack) return
 
-      // Ensure channel exists and play sound
-      audioEngine.ensureChannel(targetTrack.id, targetTrack.type)
+      // Ensure channel exists with correct instrument and play sound
+      audioEngine.ensureChannel(targetTrack.id, targetTrack.type, targetTrack.instrument?.presetId)
       audioEngine.triggerAttack(targetTrack.id, event.pitch, event.velocity)
 
       // Visual feedback

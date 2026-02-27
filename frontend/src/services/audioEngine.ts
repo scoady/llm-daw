@@ -2,25 +2,152 @@
  * Audio Engine — wraps Tone.js to provide DAW playback capabilities.
  *
  * Responsible for:
- * - Playing MIDI clips (via Tone.js Synths)
+ * - Playing MIDI clips via configurable synth presets
  * - Playing audio clips (via Tone.js Players)
  * - Transport control (play, pause, stop, seek)
  * - BPM management
  * - Per-track volume, pan, mute/solo via Tone.Channel
+ * - Dynamic instrument preset swapping
  */
 
 import * as Tone from 'tone'
 import type { Track, Clip } from '@/types'
+import { getPreset, DEFAULT_PRESET_ID, type InstrumentPreset, type SynthType } from '@/data/instrumentPresets'
+
+// ─── SynthAdapter — unified interface over all Tone.js synth types ──────────
+
+interface SynthAdapter {
+  triggerAttack(note: string, time: number, velocity: number): void
+  triggerRelease(note: string, time: number): void
+  triggerAttackRelease(note: string, duration: number | string, time: number, velocity: number): void
+  releaseAll(): void
+  connect(dest: Tone.InputNode): SynthAdapter
+  dispose(): void
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ToneConstructor = new (options?: any) => any
+
+function getToneConstructor(synthType: SynthType): ToneConstructor {
+  const map: Record<SynthType, ToneConstructor> = {
+    Synth: Tone.Synth,
+    AMSynth: Tone.AMSynth,
+    FMSynth: Tone.FMSynth,
+    MonoSynth: Tone.MonoSynth,
+    DuoSynth: Tone.DuoSynth,
+    MembraneSynth: Tone.MembraneSynth,
+    MetalSynth: Tone.MetalSynth,
+    PluckSynth: Tone.PluckSynth,
+    NoiseSynth: Tone.NoiseSynth,
+  }
+  return map[synthType]
+}
+
+class PolySynthAdapter implements SynthAdapter {
+  private synth: Tone.PolySynth
+
+  constructor(synthType: SynthType, options: Record<string, unknown>) {
+    const Ctor = getToneConstructor(synthType)
+    this.synth = new Tone.PolySynth(Ctor, options)
+  }
+
+  triggerAttack(note: string, time: number, velocity: number) {
+    this.synth.triggerAttack(note, time, velocity)
+  }
+  triggerRelease(note: string, time: number) {
+    this.synth.triggerRelease(note, time)
+  }
+  triggerAttackRelease(note: string, duration: number | string, time: number, velocity: number) {
+    this.synth.triggerAttackRelease(note, duration, time, velocity)
+  }
+  releaseAll() {
+    this.synth.releaseAll()
+  }
+  connect(dest: Tone.InputNode) {
+    this.synth.connect(dest)
+    return this
+  }
+  dispose() {
+    this.synth.dispose()
+  }
+}
+
+class MonoSynthAdapter implements SynthAdapter {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private synth: any
+  private type: SynthType
+
+  constructor(synthType: SynthType, options: Record<string, unknown>) {
+    this.type = synthType
+    const Ctor = getToneConstructor(synthType)
+    this.synth = new Ctor(options)
+  }
+
+  triggerAttack(note: string, time: number, velocity: number) {
+    if (this.type === 'NoiseSynth') {
+      this.synth.triggerAttack(time)
+    } else if (this.type === 'PluckSynth') {
+      this.synth.triggerAttack(note, time)
+    } else {
+      this.synth.triggerAttack(note, time, velocity)
+    }
+  }
+
+  triggerRelease(_note: string, time: number) {
+    if (this.type === 'PluckSynth') return // no release
+    if (this.type === 'NoiseSynth' || this.type === 'MembraneSynth' || this.type === 'MetalSynth') {
+      this.synth.triggerRelease(time)
+    } else {
+      this.synth.triggerRelease(time)
+    }
+  }
+
+  triggerAttackRelease(note: string, duration: number | string, time: number, velocity: number) {
+    if (this.type === 'NoiseSynth') {
+      this.synth.triggerAttackRelease(duration, time)
+    } else if (this.type === 'PluckSynth') {
+      this.synth.triggerAttack(note, time)
+    } else if (this.type === 'MetalSynth') {
+      this.synth.triggerAttackRelease(duration, time, velocity)
+    } else {
+      this.synth.triggerAttackRelease(note, duration, time, velocity)
+    }
+  }
+
+  releaseAll() {
+    // Mono synths don't have releaseAll, just release
+    try { this.synth.triggerRelease?.() } catch { /* ignore */ }
+  }
+
+  connect(dest: Tone.InputNode) {
+    this.synth.connect(dest)
+    return this
+  }
+
+  dispose() {
+    this.synth.dispose()
+  }
+}
+
+export function createSynthFromPreset(preset: InstrumentPreset): SynthAdapter {
+  if (preset.polyphonic) {
+    return new PolySynthAdapter(preset.synthType, preset.synthOptions)
+  }
+  return new MonoSynthAdapter(preset.synthType, preset.synthOptions)
+}
 
 // ─── Channel represents one track's audio graph ──────────────────────────────
+
 interface EngineChannel {
   channel: Tone.Channel
-  synth?: Tone.PolySynth
+  synth?: SynthAdapter
+  presetId?: string
   player?: Tone.Player
   parts: Tone.Part[]
 }
 
 // ─── AudioEngine singleton ────────────────────────────────────────────────────
+
 class AudioEngine {
   private channels = new Map<string, EngineChannel>()
   private masterGain: Tone.Gain
@@ -84,20 +211,19 @@ class AudioEngine {
   }
 
   // ── Track channels ────────────────────────────────────────────────────────
-  ensureChannel(trackId: string, type: 'midi' | 'audio' | 'instrument'): EngineChannel {
+  ensureChannel(trackId: string, type: 'midi' | 'audio' | 'instrument', presetId?: string): EngineChannel {
     if (this.channels.has(trackId)) return this.channels.get(trackId)!
 
     const channel = new Tone.Channel().connect(this.masterGain)
+    const resolvedPresetId = presetId ?? DEFAULT_PRESET_ID
 
-    let synth: Tone.PolySynth | undefined
+    let synth: SynthAdapter | undefined
     if (type === 'midi' || type === 'instrument') {
-      synth = new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: 'triangle' },
-        envelope: { attack: 0.02, decay: 0.1, sustain: 0.5, release: 0.8 },
-      }).connect(channel)
+      const preset = getPreset(resolvedPresetId)
+      synth = createSynthFromPreset(preset).connect(channel)
     }
 
-    const ch: EngineChannel = { channel, synth, parts: [] }
+    const ch: EngineChannel = { channel, synth, presetId: resolvedPresetId, parts: [] }
     this.channels.set(trackId, ch)
     return ch
   }
@@ -110,6 +236,48 @@ class AudioEngine {
     ch.player?.dispose()
     ch.channel.dispose()
     this.channels.delete(trackId)
+  }
+
+  // ── Instrument preset swapping ──────────────────────────────────────────
+  setTrackInstrument(trackId: string, presetId: string, trackType: 'midi' | 'audio' | 'instrument'): void {
+    const ch = this.ensureChannel(trackId, trackType, presetId)
+
+    // Skip if already loaded
+    if (ch.presetId === presetId) return
+
+    // Dispose old synth
+    if (ch.synth) {
+      ch.synth.releaseAll()
+      ch.synth.dispose()
+    }
+
+    // Create new synth from preset
+    const preset = getPreset(presetId)
+    ch.synth = createSynthFromPreset(preset).connect(ch.channel)
+    ch.presetId = presetId
+  }
+
+  // ── Preview a preset (transport-independent) ─────────────────────────────
+  async previewPreset(presetId: string): Promise<void> {
+    await this.init()
+    const preset = getPreset(presetId)
+    const synth = createSynthFromPreset(preset).connect(this.masterGain)
+
+    const note = Tone.Frequency(preset.previewNote ?? 60, 'midi').toNote()
+    const now = Tone.now() + 0.05
+
+    if (['drums', 'fx'].includes(preset.category) || !preset.polyphonic) {
+      synth.triggerAttackRelease(note, 0.3, now, 0.7)
+    } else {
+      // Play a major chord
+      const root = preset.previewNote ?? 60
+      const notes = [root, root + 4, root + 7]
+      for (const p of notes) {
+        synth.triggerAttackRelease(Tone.Frequency(p, 'midi').toNote(), 0.5, now, 0.6)
+      }
+    }
+
+    setTimeout(() => synth.dispose(), 1500)
   }
 
   // ── Track params ──────────────────────────────────────────────────────────
@@ -130,7 +298,13 @@ class AudioEngine {
 
   // ── Schedule clips ────────────────────────────────────────────────────────
   scheduleTrack(track: Track): void {
-    const ch = this.ensureChannel(track.id, track.type)
+    const presetId = track.instrument?.presetId ?? DEFAULT_PRESET_ID
+    const ch = this.ensureChannel(track.id, track.type, presetId)
+
+    // Ensure correct instrument is loaded
+    if (ch.presetId !== presetId) {
+      this.setTrackInstrument(track.id, presetId, track.type)
+    }
 
     // Clear existing parts
     ch.parts.forEach((p) => { p.stop(); p.dispose() })
@@ -164,8 +338,9 @@ class AudioEngine {
       }
     })
 
+    const synth = ch.synth
     const part = new Tone.Part((time, event) => {
-      ch.synth?.triggerAttackRelease(
+      synth.triggerAttackRelease(
         event.note,
         event.duration,
         time,
@@ -213,15 +388,23 @@ class AudioEngine {
 
   // ── Preview a note (for piano roll click) ─────────────────────────────────
   previewNote(pitch: number, trackId?: string): void {
-    const synth = trackId
-      ? this.channels.get(trackId)?.synth
-      : new Tone.PolySynth(Tone.Synth).toDestination()
-
-    synth?.triggerAttackRelease(
-      Tone.Frequency(pitch, 'midi').toNote(),
-      '8n',
-      Tone.now()
-    )
+    if (trackId) {
+      const ch = this.channels.get(trackId)
+      ch?.synth?.triggerAttackRelease(
+        Tone.Frequency(pitch, 'midi').toNote(),
+        0.2,
+        Tone.now(),
+        0.7
+      )
+    } else {
+      const synth = new Tone.PolySynth(Tone.Synth).toDestination()
+      synth.triggerAttackRelease(
+        Tone.Frequency(pitch, 'midi').toNote(),
+        '8n',
+        Tone.now()
+      )
+      setTimeout(() => synth.dispose(), 1000)
+    }
   }
 
   // ── Cleanup ───────────────────────────────────────────────────────────────
