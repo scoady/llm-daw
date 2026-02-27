@@ -103,28 +103,49 @@ export function Visualizer() {
       // ── Clear ─────────────────────────────────────────────────────────
       ctx.clearRect(0, 0, w, h)
 
-      // ── Draw waves ────────────────────────────────────────────────────
+      // ── Draw waves (FFT-driven) ─────────────────────────────────────
       const t = timeRef.current
       const waves = [
-        { color: '#00d4ff', energy: lowEnergy, speed: 0.8, freq: 1.5, yOff: 0.6, amp: 0.35 },
-        { color: '#6c63ff', energy: midEnergy, speed: 1.2, freq: 2.0, yOff: 0.5, amp: 0.30 },
-        { color: '#ff6bd6', energy: highEnergy, speed: 1.6, freq: 2.5, yOff: 0.4, amp: 0.25 },
+        { color: '#00d4ff', energy: lowEnergy, speed: 0.8, yOff: 0.6, binStart: 0, binEnd: lowEnd },
+        { color: '#6c63ff', energy: midEnergy, speed: 1.2, yOff: 0.5, binStart: lowEnd, binEnd: midEnd },
+        { color: '#ff6bd6', energy: highEnergy, speed: 1.6, yOff: 0.4, binStart: midEnd, binEnd: binCount },
       ]
 
       for (const wave of waves) {
-        const baseAmp = wave.amp * h
-        const reactiveAmp = baseAmp * (0.1 + wave.energy * 0.9)
         const centerY = h * wave.yOff
+        const binsForWave = wave.binEnd - wave.binStart
+        const maxAmp = h * 0.3
 
-        // Glow pass (wider, transparent)
-        ctx.beginPath()
-        ctx.moveTo(0, centerY)
+        // Build y-values: map FFT bins across the canvas width + gentle idle sine
+        const yValues: number[] = []
         for (let x = 0; x <= w; x += 2) {
           const xNorm = x / w
-          const y = centerY +
-            Math.sin(xNorm * Math.PI * wave.freq + t * wave.speed) * reactiveAmp +
-            Math.sin(xNorm * Math.PI * wave.freq * 0.5 + t * wave.speed * 0.7) * reactiveAmp * 0.3
-          ctx.lineTo(x, y)
+
+          // Sample FFT bin for this x position
+          const binIndex = wave.binStart + Math.floor(xNorm * binsForWave)
+          const fftVal = Math.max(0, (fftData[binIndex] + 80) / 80) // 0-1
+          const fftDisplace = fftVal * maxAmp * (0.5 + wave.energy * 0.5)
+
+          // Gentle base sine for idle drift
+          const idleSine = Math.sin(xNorm * Math.PI * 2 + t * wave.speed) * h * 0.03
+
+          yValues.push(centerY + idleSine - fftDisplace)
+        }
+
+        // Smooth the curve slightly to avoid jaggedness
+        const smooth: number[] = []
+        for (let i = 0; i < yValues.length; i++) {
+          const prev = yValues[Math.max(0, i - 1)]
+          const curr = yValues[i]
+          const next = yValues[Math.min(yValues.length - 1, i + 1)]
+          smooth.push(prev * 0.2 + curr * 0.6 + next * 0.2)
+        }
+
+        // Glow pass
+        ctx.beginPath()
+        ctx.moveTo(0, smooth[0])
+        for (let i = 1; i < smooth.length; i++) {
+          ctx.lineTo(i * 2, smooth[i])
         }
         ctx.strokeStyle = wave.color
         ctx.lineWidth = 6
@@ -133,13 +154,9 @@ export function Visualizer() {
 
         // Sharp pass
         ctx.beginPath()
-        ctx.moveTo(0, centerY)
-        for (let x = 0; x <= w; x += 2) {
-          const xNorm = x / w
-          const y = centerY +
-            Math.sin(xNorm * Math.PI * wave.freq + t * wave.speed) * reactiveAmp +
-            Math.sin(xNorm * Math.PI * wave.freq * 0.5 + t * wave.speed * 0.7) * reactiveAmp * 0.3
-          ctx.lineTo(x, y)
+        ctx.moveTo(0, smooth[0])
+        for (let i = 1; i < smooth.length; i++) {
+          ctx.lineTo(i * 2, smooth[i])
         }
         ctx.strokeStyle = wave.color
         ctx.lineWidth = 1.5
