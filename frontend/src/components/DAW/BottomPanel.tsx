@@ -9,12 +9,14 @@ import { Mixer } from '@/components/DAW/Mixer'
 import { PianoRollEditor } from '@/components/DAW/PianoRollEditor'
 import { MasterEQ } from '@/components/DAW/MasterEQ'
 import { Visualizer } from '@/components/DAW/Visualizer'
+import { Piano } from '@/components/DAW/Piano'
 
-type BottomTab = 'mixer' | 'editor' | 'master'
+type BottomTab = 'mixer' | 'editor' | 'master' | 'keys'
 
-const TABS: { id: BottomTab; label: string; color: 'cyan' | 'accent' | 'green' }[] = [
+const TABS: { id: BottomTab; label: string; color: 'cyan' | 'accent' | 'green' | 'amber' }[] = [
   { id: 'mixer', label: 'MIXER', color: 'cyan' },
   { id: 'editor', label: 'EDITOR', color: 'accent' },
+  { id: 'keys', label: 'KEYS', color: 'amber' },
   { id: 'master', label: 'MASTER', color: 'green' },
 ]
 
@@ -67,7 +69,9 @@ export function BottomPanel() {
                     ? '0 0 8px rgba(0, 212, 255, 0.3)'
                     : tab.color === 'accent'
                       ? '0 0 8px rgba(108, 99, 255, 0.3)'
-                      : '0 0 8px rgba(57, 255, 20, 0.3)',
+                      : tab.color === 'amber'
+                        ? '0 0 8px rgba(255, 159, 28, 0.3)'
+                        : '0 0 8px rgba(57, 255, 20, 0.3)',
                 } : undefined}
               >
                 {tab.label}
@@ -82,12 +86,16 @@ export function BottomPanel() {
                       ? '#00d4ff'
                       : tab.color === 'accent'
                         ? '#6c63ff'
-                        : '#39ff14',
+                        : tab.color === 'amber'
+                          ? '#ff9f1c'
+                          : '#39ff14',
                     boxShadow: tab.color === 'cyan'
                       ? '0 0 8px rgba(0, 212, 255, 0.5), 0 0 2px rgba(0, 212, 255, 0.8)'
                       : tab.color === 'accent'
                         ? '0 0 8px rgba(108, 99, 255, 0.5), 0 0 2px rgba(108, 99, 255, 0.8)'
-                        : '0 0 8px rgba(57, 255, 20, 0.5), 0 0 2px rgba(57, 255, 20, 0.8)',
+                        : tab.color === 'amber'
+                          ? '0 0 8px rgba(255, 159, 28, 0.5), 0 0 2px rgba(255, 159, 28, 0.8)'
+                          : '0 0 8px rgba(57, 255, 20, 0.5), 0 0 2px rgba(57, 255, 20, 0.8)',
                   }}
                 />
               )}
@@ -101,6 +109,7 @@ export function BottomPanel() {
         {bottomTab === 'mixer' && <Visualizer />}
         {bottomTab === 'mixer' && <Mixer />}
         {bottomTab === 'editor' && <PianoRollEditor />}
+        {bottomTab === 'keys' && <Piano />}
         {bottomTab === 'master' && <MasterEQ />}
       </div>
     </div>

@@ -45,7 +45,7 @@ interface DAWState {
   pianoRollClipId: string | null
 
   // Bottom panel
-  bottomTab: 'mixer' | 'editor' | 'master'
+  bottomTab: 'mixer' | 'editor' | 'master' | 'keys'
   masterEQ: { low: number; mid: number; high: number }
 
   // MIDI input
@@ -114,7 +114,7 @@ interface DAWActions {
   closePianoRoll(): void
 
   // Bottom panel
-  setBottomTab(tab: 'mixer' | 'editor' | 'master'): void
+  setBottomTab(tab: 'mixer' | 'editor' | 'master' | 'keys'): void
   setMasterEQ(band: 'low' | 'mid' | 'high', value: number): void
 
   // MIDI input
