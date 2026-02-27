@@ -22,12 +22,12 @@ export function useAudioEngine() {
     audioEngine.setBpm(bpm)
   }, [bpm])
 
-  // Sync tracks (reschedule whenever tracks change)
+  // Schedule tracks when playback starts (not on every track mutation)
   useEffect(() => {
-    if (transport.isPlaying) {
+    if (transport.isPlaying && !transport.isRecording) {
       audioEngine.scheduleTracks(tracks)
     }
-  }, [tracks, transport.isPlaying])
+  }, [transport.isPlaying])
 
   // Playhead animation loop
   useEffect(() => {

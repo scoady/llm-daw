@@ -65,15 +65,18 @@ class AudioEngine {
   }
 
   seek(beat: number): void {
-    Tone.getTransport().position = `${beat}:0:0`
+    const bars = Math.floor(beat / 4)
+    const remainder = beat % 4
+    Tone.getTransport().position = `${bars}:${remainder}:0`
   }
 
   getCurrentBeat(): number {
     const pos = Tone.getTransport().position as string
     const parts = pos.split(':')
-    const bars = parseInt(parts[0] ?? '0')
-    const beats = parseInt(parts[1] ?? '0')
-    return bars * 4 + beats
+    const bars = parseFloat(parts[0] ?? '0')
+    const beats = parseFloat(parts[1] ?? '0')
+    const sixteenths = parseFloat(parts[2] ?? '0')
+    return bars * 4 + beats + sixteenths / 4
   }
 
   isPlaying(): boolean {
@@ -146,13 +149,20 @@ class AudioEngine {
   private scheduleClipNotes(clip: Clip, ch: EngineChannel): Tone.Part | null {
     if (!clip.notes?.length || !ch.synth) return null
 
-    const beatsPerBar = 4
-    const events = clip.notes.map((note) => ({
-      time: `${Math.floor((clip.startBeat + note.startBeat) / beatsPerBar)}:${(clip.startBeat + note.startBeat) % beatsPerBar}:0`,
-      note: Tone.Frequency(note.pitch, 'midi').toNote(),
-      duration: `${note.durationBeats}n`,
-      velocity: note.velocity / 127,
-    }))
+    const bpm = Tone.getTransport().bpm.value
+    const secPerBeat = 60 / bpm
+
+    const events = clip.notes.map((note) => {
+      const startTimeInSec = (clip.startBeat + note.startBeat) * secPerBeat
+      const durationInSec = Math.max(0.05, note.durationBeats * secPerBeat)
+
+      return {
+        time: startTimeInSec,
+        note: Tone.Frequency(note.pitch, 'midi').toNote(),
+        duration: durationInSec,
+        velocity: note.velocity / 127,
+      }
+    })
 
     const part = new Tone.Part((time, event) => {
       ch.synth?.triggerAttackRelease(
