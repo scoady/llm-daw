@@ -205,6 +205,22 @@ INSTRUMENT RULES — you MUST follow these exactly:
    - Use a mix of short and long notes
    - Velocity range: 70-100
 
+CHORD PROGRESSION RULES:
+- ALWAYS use well-known, proven chord progressions that sound good. Examples:
+  - I-V-vi-IV (pop/rock anthem: C-G-Am-F)
+  - I-IV-V-I (classic resolution)
+  - ii-V-I (jazz standard)
+  - I-vi-IV-V (50s/doo-wop)
+  - vi-IV-I-V (modern pop)
+  - I-IV-vi-V (uplifting pop)
+  - i-bVII-bVI-V (minor dramatic: Am-G-F-E)
+  - i-iv-v-i (natural minor)
+  - I-V-vi-iii-IV-I-IV-V (Pachelbel/canon)
+- If the input melody doesn't strongly imply something else, default to I-IV-V-I or I-V-vi-IV in the detected key
+- The bass line MUST follow the chord roots
+- The pad/chords track MUST voice the actual chord tones
+- The lead should use chord tones on strong beats and passing tones between
+
 GENERAL RULES:
 - Generate 3-4 tracks (drums + bass + chords, optionally lead)
 - All tracks must be the same durationBeats
