@@ -103,68 +103,63 @@ export function Visualizer() {
       // ── Clear ─────────────────────────────────────────────────────────
       ctx.clearRect(0, 0, w, h)
 
-      // ── Draw waves (FFT-driven) ─────────────────────────────────────
+      // ── Draw wave (full FFT spectrum with gradient) ─────────────────
       const t = timeRef.current
-      const waves = [
-        { color: '#00d4ff', energy: lowEnergy, speed: 0.8, yOff: 0.6, binStart: 0, binEnd: lowEnd },
-        { color: '#6c63ff', energy: midEnergy, speed: 1.2, yOff: 0.5, binStart: lowEnd, binEnd: midEnd },
-        { color: '#ff6bd6', energy: highEnergy, speed: 1.6, yOff: 0.4, binStart: midEnd, binEnd: binCount },
-      ]
+      const centerY = h * 0.5
+      const maxAmp = h * 0.35
 
-      for (const wave of waves) {
-        const centerY = h * wave.yOff
-        const binsForWave = wave.binEnd - wave.binStart
-        const maxAmp = h * 0.3
-
-        // Build y-values: map FFT bins across the canvas width + gentle idle sine
-        const yValues: number[] = []
-        for (let x = 0; x <= w; x += 2) {
-          const xNorm = x / w
-
-          // Sample FFT bin for this x position
-          const binIndex = wave.binStart + Math.floor(xNorm * binsForWave)
-          const fftVal = Math.max(0, (fftData[binIndex] + 80) / 80) // 0-1
-          const fftDisplace = fftVal * maxAmp * (0.5 + wave.energy * 0.5)
-
-          // Gentle base sine for idle drift
-          const idleSine = Math.sin(xNorm * Math.PI * 2 + t * wave.speed) * h * 0.03
-
-          yValues.push(centerY + idleSine - fftDisplace)
-        }
-
-        // Smooth the curve slightly to avoid jaggedness
-        const smooth: number[] = []
-        for (let i = 0; i < yValues.length; i++) {
-          const prev = yValues[Math.max(0, i - 1)]
-          const curr = yValues[i]
-          const next = yValues[Math.min(yValues.length - 1, i + 1)]
-          smooth.push(prev * 0.2 + curr * 0.6 + next * 0.2)
-        }
-
-        // Glow pass
-        ctx.beginPath()
-        ctx.moveTo(0, smooth[0])
-        for (let i = 1; i < smooth.length; i++) {
-          ctx.lineTo(i * 2, smooth[i])
-        }
-        ctx.strokeStyle = wave.color
-        ctx.lineWidth = 6
-        ctx.globalAlpha = 0.05 + wave.energy * 0.2
-        ctx.stroke()
-
-        // Sharp pass
-        ctx.beginPath()
-        ctx.moveTo(0, smooth[0])
-        for (let i = 1; i < smooth.length; i++) {
-          ctx.lineTo(i * 2, smooth[i])
-        }
-        ctx.strokeStyle = wave.color
-        ctx.lineWidth = 1.5
-        ctx.globalAlpha = 0.15 + wave.energy * 0.7
-        ctx.stroke()
-
-        ctx.globalAlpha = 1
+      // Build y-values: map all FFT bins across canvas width
+      const yValues: number[] = []
+      for (let x = 0; x <= w; x += 2) {
+        const xNorm = x / w
+        const binIndex = Math.min(binCount - 1, Math.floor(xNorm * binCount))
+        const fftVal = Math.max(0, (fftData[binIndex] + 80) / 80)
+        const fftDisplace = fftVal * maxAmp * (0.5 + totalEnergy * 0.5)
+        const idleSine = Math.sin(xNorm * Math.PI * 2 + t * 0.8) * h * 0.03
+        yValues.push(centerY + idleSine - fftDisplace)
       }
+
+      // Smooth the curve (3-tap)
+      const smooth: number[] = []
+      for (let i = 0; i < yValues.length; i++) {
+        const prev = yValues[Math.max(0, i - 1)]
+        const curr = yValues[i]
+        const next = yValues[Math.min(yValues.length - 1, i + 1)]
+        smooth.push(prev * 0.2 + curr * 0.6 + next * 0.2)
+      }
+
+      // Gradient: cyan → blue → purple → magenta → pink
+      const gradient = ctx.createLinearGradient(0, 0, w, 0)
+      gradient.addColorStop(0, '#00d4ff')
+      gradient.addColorStop(0.2, '#00a0ff')
+      gradient.addColorStop(0.4, '#6c63ff')
+      gradient.addColorStop(0.6, '#9b59ff')
+      gradient.addColorStop(0.8, '#d94fdf')
+      gradient.addColorStop(1, '#ff6bd6')
+
+      // Glow pass
+      ctx.beginPath()
+      ctx.moveTo(0, smooth[0])
+      for (let i = 1; i < smooth.length; i++) {
+        ctx.lineTo(i * 2, smooth[i])
+      }
+      ctx.strokeStyle = gradient
+      ctx.lineWidth = 8
+      ctx.globalAlpha = 0.08 + totalEnergy * 0.15
+      ctx.stroke()
+
+      // Sharp pass
+      ctx.beginPath()
+      ctx.moveTo(0, smooth[0])
+      for (let i = 1; i < smooth.length; i++) {
+        ctx.lineTo(i * 2, smooth[i])
+      }
+      ctx.strokeStyle = gradient
+      ctx.lineWidth = 2
+      ctx.globalAlpha = 0.3 + totalEnergy * 0.6
+      ctx.stroke()
+
+      ctx.globalAlpha = 1
 
       // ── Draw particles ────────────────────────────────────────────────
       // Lazy-init particles
