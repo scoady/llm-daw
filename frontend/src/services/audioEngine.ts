@@ -422,9 +422,8 @@ class AudioEngine {
         const part = this.scheduleClipNotes(clip, ch)
         if (part) ch.parts.push(part)
       }
-      if (clip.audioUrl && track.type === 'audio') {
-        const event = this.scheduleAudioClip(clip, ch)
-        if (event) ch.parts.push(event as unknown as Tone.Part)
+      if (clip.audioUrl) {
+        this.scheduleAudioClip(clip, ch)
       }
     }
   }
@@ -518,34 +517,25 @@ class AudioEngine {
 
   // ── Audio clip playback ──────────────────────────────────────────────────
 
-  async loadAudioClip(trackId: string, audioUrl: string): Promise<void> {
-    const ch = this.channels.get(trackId)
-    if (!ch) return
-
-    // Dispose existing player
-    if (ch.player) {
-      ch.player.stop()
-      ch.player.dispose()
-    }
-
-    const player = new Tone.Player(audioUrl).connect(ch.channel)
-    ch.player = player
-    await player.load(audioUrl)
-  }
-
-  private scheduleAudioClip(clip: Clip, ch: EngineChannel): Tone.ToneEvent | null {
-    if (!ch.player || !clip.audioUrl) return null
+  private scheduleAudioClip(clip: Clip, ch: EngineChannel): void {
+    if (!clip.audioUrl) return
 
     const bpm = Tone.getTransport().bpm.value
     const secPerBeat = 60 / bpm
     const startTime = clip.startBeat * secPerBeat
 
-    const player = ch.player
-    const event = new Tone.ToneEvent((time) => {
-      player.start(time)
+    // Each audio clip gets its own player
+    const player = new Tone.Player().connect(ch.channel)
+    player.load(clip.audioUrl).then(() => {
+      const event = new Tone.ToneEvent((time) => {
+        player.start(time)
+      })
+      event.start(startTime)
+      ch.parts.push(event as unknown as Tone.Part)
     })
-    event.start(startTime)
-    return event
+
+    // Track player for cleanup
+    if (!ch.player) ch.player = player
   }
 
   async previewAudioFile(url: string): Promise<void> {
@@ -553,7 +543,6 @@ class AudioEngine {
     const player = new Tone.Player(url).connect(this.masterGain)
     await player.load(url)
     player.start()
-    // Dispose after playback
     player.onstop = () => {
       setTimeout(() => player.dispose(), 100)
     }

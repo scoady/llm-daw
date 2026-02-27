@@ -10,7 +10,7 @@ import type { AudioFileInfo } from '@/types'
 
 export function AudioBrowser() {
   const { audioFiles, isUploading, uploadAudioFile } = useLibraryStore()
-  const { insertLibraryClip } = useDAWStore()
+  const { addTrack, selectTrack, bpm } = useDAWStore()
   const [previewingId, setPreviewingId] = useState<string | null>(null)
 
   const handleUpload = useCallback((file: File) => {
@@ -25,17 +25,24 @@ export function AudioBrowser() {
   }, [])
 
   const handleInsert = useCallback((file: AudioFileInfo) => {
-    insertLibraryClip({
-      id: crypto.randomUUID(),
+    // Create a new audio track for this file
+    const track = addTrack('audio', file.filename.replace(/\.[^.]+$/, ''))
+    selectTrack(track.id)
+
+    // Calculate duration in beats from seconds
+    const secPerBeat = 60 / bpm
+    const durationBeats = file.durationSecs
+      ? Math.ceil(file.durationSecs / secPerBeat)
+      : 8
+
+    // Add clip to the new audio track via store
+    const { addClip, updateClip } = useDAWStore.getState()
+    const clip = addClip(track.id, 0, durationBeats)
+    updateClip(track.id, clip.id, {
       name: file.filename,
-      category: 'uncategorized',
-      clipType: 'audio',
-      durationBeats: file.durationSecs ? Math.ceil(file.durationSecs * 2) : 8,
-      bpm: 120,
-      audioFileId: file.id,
-      createdAt: new Date().toISOString(),
+      audioUrl: audioFileUrl(file.id),
     })
-  }, [insertLibraryClip])
+  }, [addTrack, selectTrack, bpm])
 
   return (
     <div className="flex flex-col h-full">
