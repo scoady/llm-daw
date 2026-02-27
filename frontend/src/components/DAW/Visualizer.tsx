@@ -95,9 +95,9 @@ export function Visualizer() {
         else highEnergy += norm
       }
 
-      lowEnergy = Math.min(1, lowEnergy / Math.max(1, lowEnd) * 1.5)
-      midEnergy = Math.min(1, midEnergy / Math.max(1, midEnd - lowEnd) * 1.5)
-      highEnergy = Math.min(1, highEnergy / Math.max(1, binCount - midEnd) * 1.5)
+      lowEnergy = Math.min(1, (lowEnergy / Math.max(1, lowEnd)) ** 0.6 * 2.5)
+      midEnergy = Math.min(1, (midEnergy / Math.max(1, midEnd - lowEnd)) ** 0.6 * 2.5)
+      highEnergy = Math.min(1, (highEnergy / Math.max(1, binCount - midEnd)) ** 0.6 * 2.5)
       const totalEnergy = (lowEnergy + midEnergy + highEnergy) / 3
 
       // ── Clear ─────────────────────────────────────────────────────────
@@ -106,14 +106,14 @@ export function Visualizer() {
       // ── Draw waves ────────────────────────────────────────────────────
       const t = timeRef.current
       const waves = [
-        { color: '#00d4ff', energy: lowEnergy, speed: 0.8, freq: 1.5, yOff: 0.55, amp: 0.12 },
-        { color: '#6c63ff', energy: midEnergy, speed: 1.2, freq: 2.0, yOff: 0.50, amp: 0.10 },
-        { color: '#ff6bd6', energy: highEnergy, speed: 1.6, freq: 2.5, yOff: 0.45, amp: 0.08 },
+        { color: '#00d4ff', energy: lowEnergy, speed: 0.8, freq: 1.5, yOff: 0.6, amp: 0.35 },
+        { color: '#6c63ff', energy: midEnergy, speed: 1.2, freq: 2.0, yOff: 0.5, amp: 0.30 },
+        { color: '#ff6bd6', energy: highEnergy, speed: 1.6, freq: 2.5, yOff: 0.4, amp: 0.25 },
       ]
 
       for (const wave of waves) {
         const baseAmp = wave.amp * h
-        const reactiveAmp = baseAmp * (0.3 + wave.energy * 0.7)
+        const reactiveAmp = baseAmp * (0.1 + wave.energy * 0.9)
         const centerY = h * wave.yOff
 
         // Glow pass (wider, transparent)
@@ -128,7 +128,7 @@ export function Visualizer() {
         }
         ctx.strokeStyle = wave.color
         ctx.lineWidth = 6
-        ctx.globalAlpha = 0.08 + wave.energy * 0.06
+        ctx.globalAlpha = 0.05 + wave.energy * 0.2
         ctx.stroke()
 
         // Sharp pass
@@ -143,7 +143,7 @@ export function Visualizer() {
         }
         ctx.strokeStyle = wave.color
         ctx.lineWidth = 1.5
-        ctx.globalAlpha = 0.25 + wave.energy * 0.35
+        ctx.globalAlpha = 0.15 + wave.energy * 0.7
         ctx.stroke()
 
         ctx.globalAlpha = 1
@@ -159,7 +159,7 @@ export function Visualizer() {
 
       for (const p of particlesRef.current) {
         // Update position
-        const speedMult = 0.5 + totalEnergy * 1.5
+        const speedMult = 0.3 + totalEnergy * 3.0
         p.x += p.vx + Math.sin(t + p.y * 0.01) * 0.2
         p.y += p.vy * speedMult
 
@@ -168,7 +168,7 @@ export function Visualizer() {
         if (p.x < -10) p.x = w + 10
         if (p.x > w + 10) p.x = -10
 
-        const brightAlpha = p.alpha * (0.4 + totalEnergy * 0.6)
+        const brightAlpha = p.alpha * (0.2 + totalEnergy * 1.5)
 
         // Glow pass
         ctx.beginPath()
