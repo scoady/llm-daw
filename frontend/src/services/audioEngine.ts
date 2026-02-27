@@ -26,7 +26,7 @@ interface SynthAdapter {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type ToneConstructor = new (options?: any) => any
+type ToneConstructor = any
 
 function getToneConstructor(synthType: SynthType): ToneConstructor {
   const map: Record<SynthType, ToneConstructor> = {
