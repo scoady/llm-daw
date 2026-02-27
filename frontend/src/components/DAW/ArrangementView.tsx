@@ -23,14 +23,14 @@ function hexToRgb(hex: string): [number, number, number] {
   ]
 }
 
-function lighten(hex: string, amount: number): string {
+function lighten(hex: string, amount: number, alpha = 1): string {
   const [r, g, b] = hexToRgb(hex)
-  return `rgb(${Math.min(255, r + amount)},${Math.min(255, g + amount)},${Math.min(255, b + amount)})`
+  return `rgba(${Math.min(255, r + amount)},${Math.min(255, g + amount)},${Math.min(255, b + amount)},${alpha})`
 }
 
-function darken(hex: string, amount: number): string {
+function darken(hex: string, amount: number, alpha = 1): string {
   const [r, g, b] = hexToRgb(hex)
-  return `rgb(${Math.max(0, r - amount)},${Math.max(0, g - amount)},${Math.max(0, b - amount)})`
+  return `rgba(${Math.max(0, r - amount)},${Math.max(0, g - amount)},${Math.max(0, b - amount)},${alpha})`
 }
 
 // ─── Canvas drawing helpers ───────────────────────────────────────────────────
@@ -213,9 +213,9 @@ function drawClip(
 
   // Clip body gradient
   const grad = ctx.createLinearGradient(x, y, x, y + h)
-  grad.addColorStop(0, lighten(color, 20) + 'dd')
-  grad.addColorStop(0.15, color + 'cc')
-  grad.addColorStop(1, darken(color, 30) + 'aa')
+  grad.addColorStop(0, lighten(color, 20, 0.87))
+  grad.addColorStop(0.15, lighten(color, 0, 0.8))
+  grad.addColorStop(1, darken(color, 30, 0.67))
   ctx.beginPath()
   ctx.roundRect(x, y, Math.max(w, 2), h, radius)
   ctx.fillStyle = grad
