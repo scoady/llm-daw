@@ -7,6 +7,10 @@ metadata:
   labels:
     {{- include "llm-daw.labels" . | nindent 4 }}
     app.kubernetes.io/component: frontend
+  annotations:
+    # Longer timeout for AI analysis requests (Claude can take several seconds)
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
 spec:
   ingressClassName: {{ .Values.frontend.ingress.className }}
   rules:
@@ -14,6 +18,13 @@ spec:
     - host: {{ .Values.frontend.ingress.host }}
       http:
         paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: {{ .Values.api.port }}
           - path: /
             pathType: Prefix
             backend:
@@ -24,6 +35,13 @@ spec:
     {{- else }}
     - http:
         paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: {{ .Values.api.port }}
           - path: /
             pathType: Prefix
             backend:
