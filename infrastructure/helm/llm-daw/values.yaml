@@ -1,0 +1,90 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# LLM-DAW Helm values — kind / local-dev defaults
+#
+# Deploy with:
+#   helm upgrade --install llm-daw ./infrastructure/helm/llm-daw \
+#     --namespace llm-daw --create-namespace \
+#     --values ./infrastructure/helm/llm-daw/values.yaml
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Global ────────────────────────────────────────────────────────────────────
+global:
+  # Registry prefix prepended to every image reference.
+  # Empty (default) → no prefix, for the local build-and-load.sh workflow.
+  # Jenkins CI sets this to: registry.registry.svc.cluster.local:5000
+  imageRegistry: ""
+
+# ── PostgreSQL ────────────────────────────────────────────────────────────────
+postgres:
+  image:
+    repository: postgres
+    tag: "15-alpine"
+
+  credentials:
+    database: llmdaw
+    user: llmdaw
+    password: llmdaw-secret-pw
+
+  storage: 1Gi
+
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# ── Redis ─────────────────────────────────────────────────────────────────────
+redis:
+  image:
+    repository: redis
+    tag: "7-alpine"
+
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "100m"
+
+# ── Frontend (React SPA via nginx) ────────────────────────────────────────────
+frontend:
+  image:
+    repository: llm-daw/frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  replicas: 2
+
+  ingress:
+    enabled: true
+    className: nginx
+    host: ""
+
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "100m"
+
+# ── API (Node.js Fastify) ────────────────────────────────────────────────────
+api:
+  image:
+    repository: llm-daw/api
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  replicas: 2
+  port: 4000
+
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"

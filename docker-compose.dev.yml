@@ -1,0 +1,98 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+      target: development
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:4000
+      - VITE_AI_URL=http://localhost:8001
+      - VITE_WS_URL=ws://localhost:4000
+    command: npm run dev -- --host 0.0.0.0
+
+  api:
+    build:
+      context: ./backend/api
+      target: development
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./backend/api:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://llmdaw:llmdaw@postgres:5432/llmdaw
+      - REDIS_URL=redis://redis:6379
+      - AI_SERVICE_URL=http://ai-service:8001
+      - JWT_SECRET=dev-secret-key
+      - UPLOAD_DIR=/app/uploads
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: npm run dev
+
+  ai-service:
+    build:
+      context: ./backend/ai-service
+      target: development
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./backend/ai-service:/app
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=debug
+    command: uvicorn main:app --reload --host 0.0.0.0 --port 8001
+
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=llmdaw
+      - POSTGRES_USER=llmdaw
+      - POSTGRES_PASSWORD=llmdaw
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+      - ./backend/api/src/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U llmdaw"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - minio_data_dev:/data
+
+volumes:
+  postgres_data_dev:
+  minio_data_dev:

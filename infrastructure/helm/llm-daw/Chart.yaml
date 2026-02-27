@@ -1,0 +1,11 @@
+apiVersion: v2
+name: llm-daw
+description: LLM-DAW — AI-powered browser DAW with MIDI input and Claude integration.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - daw
+  - midi
+  - ai
+  - music
