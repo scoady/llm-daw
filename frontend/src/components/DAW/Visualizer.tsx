@@ -1,13 +1,30 @@
 /**
- * Visualizer — Retro wave + particle background for the Mixer tab.
- * Renders flowing sine waves driven by FFT data, floating particles,
- * and a CRT scan-line/vignette overlay. Ambient drift when idle.
+ * Visualizer — FFT frequency bars + floating particles behind the Mixer tab.
+ * Each bar gets a random color and lights up when its frequency bin is active.
+ * CRT scan-line/vignette overlay for retro feel.
  */
 import { useRef, useEffect } from 'react'
 import { audioEngine } from '@/services/audioEngine'
 
 const FRAME_INTERVAL = 1000 / 30 // ~30fps
 const PARTICLE_COUNT = 50
+const BAR_COUNT = 64
+
+// ─── Pre-generate stable random colors for each bar ──────────────────────────
+
+const PALETTE = [
+  '#00d4ff', '#00a0ff', '#3b82f6', '#6c63ff', '#9b59ff',
+  '#c850c0', '#d94fdf', '#ff6bd6', '#ff4fa0', '#ff6b6b',
+  '#ff9f43', '#ffd93d', '#6bff6b', '#39ff14', '#00ffc8',
+]
+
+function generateBarColors(): string[] {
+  const colors: string[] = []
+  for (let i = 0; i < BAR_COUNT; i++) {
+    colors.push(PALETTE[Math.floor(Math.random() * PALETTE.length)])
+  }
+  return colors
+}
 
 // ─── Particle ─────────────────────────────────────────────────────────────────
 
@@ -22,7 +39,6 @@ interface Particle {
 }
 
 function createParticle(w: number, h: number): Particle {
-  const colors = ['#00d4ff', '#6c63ff', '#ff6bd6']
   return {
     x: Math.random() * w,
     y: Math.random() * h,
@@ -30,7 +46,7 @@ function createParticle(w: number, h: number): Particle {
     vy: -(Math.random() * 0.4 + 0.1),
     radius: Math.random() * 1.5 + 0.5,
     alpha: Math.random() * 0.4 + 0.1,
-    color: colors[Math.floor(Math.random() * colors.length)],
+    color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
   }
 }
 
@@ -42,6 +58,7 @@ export function Visualizer() {
   const animRef = useRef<number>(0)
   const sizeRef = useRef({ w: 0, h: 0 })
   const particlesRef = useRef<Particle[]>([])
+  const barColorsRef = useRef<string[]>(generateBarColors())
   const scanLineOffset = useRef(0)
   const timeRef = useRef(0)
 
@@ -79,90 +96,66 @@ export function Visualizer() {
 
       const ctx = canvas.getContext('2d')!
       const fftData = audioEngine.getFrequencyData()
-
-      // ── Compute energy bands ──────────────────────────────────────────
       const binCount = fftData.length
-      let lowEnergy = 0
-      let midEnergy = 0
-      let highEnergy = 0
-      const lowEnd = Math.floor(binCount * 0.15)
-      const midEnd = Math.floor(binCount * 0.5)
+      const t = timeRef.current
 
+      // Total energy for particles
+      let totalEnergy = 0
       for (let i = 0; i < binCount; i++) {
-        const norm = Math.max(0, (fftData[i] + 80) / 80)
-        if (i < lowEnd) lowEnergy += norm
-        else if (i < midEnd) midEnergy += norm
-        else highEnergy += norm
+        totalEnergy += Math.max(0, (fftData[i] + 80) / 80)
       }
-
-      lowEnergy = Math.min(1, (lowEnergy / Math.max(1, lowEnd)) ** 0.6 * 2.5)
-      midEnergy = Math.min(1, (midEnergy / Math.max(1, midEnd - lowEnd)) ** 0.6 * 2.5)
-      highEnergy = Math.min(1, (highEnergy / Math.max(1, binCount - midEnd)) ** 0.6 * 2.5)
-      const totalEnergy = (lowEnergy + midEnergy + highEnergy) / 3
+      totalEnergy = Math.min(1, (totalEnergy / binCount) ** 0.6 * 2.5)
 
       // ── Clear ─────────────────────────────────────────────────────────
       ctx.clearRect(0, 0, w, h)
 
-      // ── Draw wave (full FFT spectrum with gradient) ─────────────────
-      const t = timeRef.current
-      const centerY = h * 0.5
-      const maxAmp = h * 0.35
+      // ── Frequency bars ────────────────────────────────────────────────
+      const barColors = barColorsRef.current
+      const gap = 2
+      const barWidth = Math.max(2, (w - gap * BAR_COUNT) / BAR_COUNT)
+      const binsPerBar = Math.floor(binCount / BAR_COUNT)
 
-      // Build y-values: map all FFT bins across canvas width
-      const yValues: number[] = []
-      for (let x = 0; x <= w; x += 2) {
-        const xNorm = x / w
-        const binIndex = Math.min(binCount - 1, Math.floor(xNorm * binCount))
-        const fftVal = Math.max(0, (fftData[binIndex] + 80) / 80)
-        const fftDisplace = fftVal * maxAmp * (0.5 + totalEnergy * 0.5)
-        const idleSine = Math.sin(xNorm * Math.PI * 2 + t * 0.8) * h * 0.03
-        yValues.push(centerY + idleSine - fftDisplace)
+      for (let i = 0; i < BAR_COUNT; i++) {
+        // Average the FFT bins for this bar
+        let sum = 0
+        const startBin = i * binsPerBar
+        for (let b = 0; b < binsPerBar; b++) {
+          sum += Math.max(0, (fftData[startBin + b] + 80) / 80)
+        }
+        const level = Math.min(1, (sum / binsPerBar) ** 0.5 * 2.0)
+
+        if (level < 0.05) continue // skip silent bars
+
+        const barH = level * h * 0.85
+        const x = i * (barWidth + gap)
+        const color = barColors[i]
+
+        // Glow pass (wider, transparent)
+        ctx.fillStyle = color
+        ctx.globalAlpha = level * 0.2
+        ctx.beginPath()
+        ctx.roundRect(x - 2, h - barH - 2, barWidth + 4, barH + 2, 3)
+        ctx.fill()
+
+        // Solid bar
+        ctx.globalAlpha = 0.3 + level * 0.6
+        ctx.beginPath()
+        ctx.roundRect(x, h - barH, barWidth, barH, [2, 2, 0, 0])
+        ctx.fill()
+
+        // Hot tip glow
+        if (level > 0.3) {
+          ctx.globalAlpha = level * 0.5
+          ctx.shadowColor = color
+          ctx.shadowBlur = 8
+          ctx.fillRect(x, h - barH, barWidth, 2)
+          ctx.shadowBlur = 0
+        }
+
+        ctx.globalAlpha = 1
       }
-
-      // Smooth the curve (3-tap)
-      const smooth: number[] = []
-      for (let i = 0; i < yValues.length; i++) {
-        const prev = yValues[Math.max(0, i - 1)]
-        const curr = yValues[i]
-        const next = yValues[Math.min(yValues.length - 1, i + 1)]
-        smooth.push(prev * 0.2 + curr * 0.6 + next * 0.2)
-      }
-
-      // Gradient: cyan → blue → purple → magenta → pink
-      const gradient = ctx.createLinearGradient(0, 0, w, 0)
-      gradient.addColorStop(0, '#00d4ff')
-      gradient.addColorStop(0.2, '#00a0ff')
-      gradient.addColorStop(0.4, '#6c63ff')
-      gradient.addColorStop(0.6, '#9b59ff')
-      gradient.addColorStop(0.8, '#d94fdf')
-      gradient.addColorStop(1, '#ff6bd6')
-
-      // Glow pass
-      ctx.beginPath()
-      ctx.moveTo(0, smooth[0])
-      for (let i = 1; i < smooth.length; i++) {
-        ctx.lineTo(i * 2, smooth[i])
-      }
-      ctx.strokeStyle = gradient
-      ctx.lineWidth = 8
-      ctx.globalAlpha = 0.08 + totalEnergy * 0.15
-      ctx.stroke()
-
-      // Sharp pass
-      ctx.beginPath()
-      ctx.moveTo(0, smooth[0])
-      for (let i = 1; i < smooth.length; i++) {
-        ctx.lineTo(i * 2, smooth[i])
-      }
-      ctx.strokeStyle = gradient
-      ctx.lineWidth = 2
-      ctx.globalAlpha = 0.3 + totalEnergy * 0.6
-      ctx.stroke()
-
-      ctx.globalAlpha = 1
 
       // ── Draw particles ────────────────────────────────────────────────
-      // Lazy-init particles
       if (particlesRef.current.length === 0) {
         for (let i = 0; i < PARTICLE_COUNT; i++) {
           particlesRef.current.push(createParticle(w, h))
@@ -170,19 +163,17 @@ export function Visualizer() {
       }
 
       for (const p of particlesRef.current) {
-        // Update position
         const speedMult = 0.3 + totalEnergy * 3.0
         p.x += p.vx + Math.sin(t + p.y * 0.01) * 0.2
         p.y += p.vy * speedMult
 
-        // Wrap around
         if (p.y < -10) { p.y = h + 10; p.x = Math.random() * w }
         if (p.x < -10) p.x = w + 10
         if (p.x > w + 10) p.x = -10
 
         const brightAlpha = p.alpha * (0.2 + totalEnergy * 1.5)
 
-        // Glow pass
+        // Glow
         ctx.beginPath()
         ctx.arc(p.x, p.y, p.radius * 3, 0, Math.PI * 2)
         ctx.fillStyle = p.color
@@ -206,7 +197,6 @@ export function Visualizer() {
         ctx.fillRect(0, y, w, 1)
       }
 
-      // Vignette
       const vigGrad = ctx.createRadialGradient(w / 2, h / 2, w * 0.3, w / 2, h / 2, w * 0.7)
       vigGrad.addColorStop(0, 'transparent')
       vigGrad.addColorStop(1, 'rgba(0, 0, 0, 0.3)')
