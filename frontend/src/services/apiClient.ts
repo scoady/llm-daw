@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Project, Track, Clip, AIGenerationRequest, AIGenerationResult, Note, AnalysisResult, Suggestion } from '@/types'
+import type { Project, Track, Note, AnalysisResult, Suggestion } from '@/types'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000'
 

@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import {
   Play, Pause, Square, Circle,
-  SkipBack, Repeat, Timer,
+  SkipBack, Repeat,
   ZoomIn, ZoomOut, Sparkles,
   ChevronUp, ChevronDown,
 } from 'lucide-react'

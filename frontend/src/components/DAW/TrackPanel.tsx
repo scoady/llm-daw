@@ -4,8 +4,6 @@ import { TrackHeader } from './TrackHeader'
 import { Button } from '@/components/common/Button'
 import { LEDIndicator } from '@/components/common/LEDIndicator'
 
-const TRACK_HEIGHT = 64
-
 export function TrackPanel() {
   const {
     tracks,

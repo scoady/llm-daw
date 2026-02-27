@@ -10,7 +10,7 @@
  */
 
 import * as Tone from 'tone'
-import type { Track, Clip, Note } from '@/types'
+import type { Track, Clip } from '@/types'
 
 // ─── Channel represents one track's audio graph ──────────────────────────────
 interface EngineChannel {

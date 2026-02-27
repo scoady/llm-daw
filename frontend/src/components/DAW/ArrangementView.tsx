@@ -393,7 +393,6 @@ export function ArrangementView() {
   const containerRef = useRef<HTMLDivElement>(null)
   const [canvasSize, setCanvasSize] = useState({ w: 0, h: 0 })
   const dashOffsetRef = useRef(0)
-  const animFrameRef = useRef(0)
 
   const {
     tracks,

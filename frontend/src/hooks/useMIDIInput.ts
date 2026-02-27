@@ -15,16 +15,9 @@ export function useMIDIInput() {
   const pendingNotes = useRef<Map<number, { startBeat: number; velocity: number }>>(new Map())
 
   const {
-    tracks,
-    transport,
     selectedMidiDeviceId,
-    recordingClipId,
-    recordingStartBeat,
     setMidiDevices,
     selectMidiDevice,
-    addActiveMidiNote,
-    removeActiveMidiNote,
-    addNote,
   } = useDAWStore()
 
   // Initialize Web MIDI on mount

@@ -16,7 +16,7 @@ import { LEDIndicator } from '@/components/common/LEDIndicator'
 // ─── Status Bar ──────────────────────────────────────────────────────────────
 
 function StatusBar() {
-  const { projectName, tracks, bpm } = useDAWStore()
+  const { projectName, tracks } = useDAWStore()
   const [cpuLoad] = useState(() => (Math.random() * 8 + 2).toFixed(1))
 
   return (

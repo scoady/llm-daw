@@ -1,8 +1,8 @@
-import { useCallback, useRef, useEffect, useState } from 'react'
+import { useCallback, useRef, useEffect } from 'react'
 import {
   Sparkles, Play, Square, Plus, Send,
   Music, Waves, ArrowRight, Loader2,
-  AlertCircle, X, Zap, Activity,
+  X, Zap, Activity,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useDAWStore, selectClipById } from '@/store/dawStore'
@@ -216,7 +216,7 @@ function MiniNotePreview({ notes, height = 48 }: { notes: Note[]; height?: numbe
 // ─── Suggestion Card ────────────────────────────────────────────────────────
 
 function SuggestionCard({ suggestion, index }: { suggestion: Suggestion; index: number }) {
-  const { bpm, tracks, addTrack, addClip, addNote, selectedClipId } = useDAWStore()
+  const { bpm, tracks, addTrack, addClip, addNote } = useDAWStore()
   const { previewingSuggestionId, setPreviewingSuggestionId } = useAIStore()
   const isPreviewing = previewingSuggestionId === suggestion.id
   const previewSynthRef = useRef<Tone.PolySynth | null>(null)

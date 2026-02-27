@@ -3,7 +3,7 @@
  * Velocity-colored notes, velocity lane, 3D piano keys, tool icons.
  */
 import { useRef, useEffect, useCallback, useState } from 'react'
-import { X, MousePointer2, Pencil, Eraser, Maximize2 } from 'lucide-react'
+import { MousePointer2, Pencil, Eraser, Maximize2 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useDAWStore, selectClipById } from '@/store/dawStore'
 import { audioEngine } from '@/services/audioEngine'
@@ -29,7 +29,7 @@ function velocityColor(velocity: number): string {
   return `hsl(${0 + (1 - v) * 20}, 90%, 55%)`
 }
 
-function noteColor(pitch: number, velocity: number, selected: boolean): string {
+function noteColor(_pitch: number, velocity: number, selected: boolean): string {
   if (selected) return '#ff6bd6'
   return velocityColor(velocity)
 }
@@ -103,7 +103,7 @@ function PianoKeys({
 // ─── Note grid canvas ─────────────────────────────────────────────────────────
 function NoteGrid({
   notes,
-  clipDuration,
+  clipDuration: _clipDuration,
   ppb,
   scrollLeft,
   scrollTop,
@@ -404,7 +404,6 @@ export function PianoRoll() {
     pianoRollOpen,
     pianoRollClipId,
     closePianoRoll,
-    tracks,
     transport,
     addNote,
     removeNote,

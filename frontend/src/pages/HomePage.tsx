@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router-dom'
-import { useRef, useEffect } from 'react'
 import { Plus, Music, Sparkles, Keyboard, Waves, Cpu } from 'lucide-react'
 import { Button } from '@/components/common/Button'
 import { LEDIndicator } from '@/components/common/LEDIndicator'
