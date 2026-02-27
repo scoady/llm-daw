@@ -401,7 +401,7 @@ interface SmartPrompt {
 }
 
 const SMART_PROMPTS: SmartPrompt[] = [
-  { icon: '🥁', label: 'Generate a drum beat',     prompt: 'Generate a drum beat pattern that complements this melody', targetPresetId: 'kick', instrumentHint: 'drums' },
+  { icon: '🥁', label: 'Generate a drum beat',     prompt: 'Generate a drum beat pattern that complements this melody', targetPresetId: 'acoustic-kit', instrumentHint: 'drums' },
   { icon: '🎸', label: 'Add a bass line',          prompt: 'Add a bass line that complements this', targetPresetId: 'synth-bass', instrumentHint: 'bass' },
   { icon: '🎹', label: 'Harmonize with piano',     prompt: 'Create a piano chord accompaniment for this melody', targetPresetId: 'classic-piano', instrumentHint: 'piano' },
   { icon: '☁️', label: 'Add a pad progression',    prompt: 'Create a lush pad chord progression behind this melody', targetPresetId: 'warm-pad', instrumentHint: 'pad' },

@@ -41,6 +41,24 @@ interface GenerateRequest {
   style?: string
 }
 
+// ─── JSON extraction helper ─────────────────────────────────────────────────
+// Claude sometimes wraps JSON in ```json ... ``` code blocks despite instructions.
+
+function extractJSON(text: string): string {
+  // Try markdown code block first
+  const codeBlock = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/)
+  if (codeBlock?.[1]) return codeBlock[1].trim()
+
+  // Try to find raw JSON object or array
+  const obj = text.match(/(\{[\s\S]*\})/)
+  if (obj?.[1]) return obj[1].trim()
+
+  const arr = text.match(/(\[[\s\S]*\])/)
+  if (arr?.[1]) return arr[1].trim()
+
+  return text.trim()
+}
+
 // ─── Note name helpers ───────────────────────────────────────────────────────
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
@@ -286,12 +304,7 @@ app.post<{ Body: AnalyzeRequest }>('/api/ai/analyze', async (request, reply) => 
     })
 
     const text = message.content[0]?.type === 'text' ? message.content[0].text : ''
-
-    // Extract JSON from response (handle markdown code blocks)
-    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [null, text]
-    const jsonStr = (jsonMatch[1] ?? text).trim()
-
-    const result = JSON.parse(jsonStr)
+    const result = JSON.parse(extractJSON(text))
 
     return {
       ...result,
@@ -337,10 +350,7 @@ app.post<{ Body: GenerateRequest }>('/api/ai/generate', async (request, reply) =
     })
 
     const text = message.content[0]?.type === 'text' ? message.content[0].text : '[]'
-    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [null, text]
-    const jsonStr = (jsonMatch[1] ?? text).trim()
-
-    const notes = JSON.parse(jsonStr)
+    const notes = JSON.parse(extractJSON(text))
 
     return {
       notes,

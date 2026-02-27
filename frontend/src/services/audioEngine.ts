@@ -39,6 +39,7 @@ function getToneConstructor(synthType: SynthType): ToneConstructor {
     MetalSynth: Tone.MetalSynth,
     PluckSynth: Tone.PluckSynth,
     NoiseSynth: Tone.NoiseSynth,
+    Sampler: Tone.Synth, // Not used directly — DrumKitAdapter handles Sampler type
   }
   return map[synthType]
 }
@@ -129,7 +130,85 @@ class MonoSynthAdapter implements SynthAdapter {
   }
 }
 
+/**
+ * DrumKitAdapter — plays acoustic drum one-shots mapped to GM MIDI pitches.
+ * Each drum hit is a Tone.Player loading a WAV sample from /public/samples/.
+ */
+class DrumKitAdapter implements SynthAdapter {
+  private players = new Map<number, Tone.Player>()
+  private output: Tone.Gain
+  private ready = false
+  private readyPromise: Promise<void>
+
+  constructor(sampleMap: Record<number, string>, baseUrl: string) {
+    this.output = new Tone.Gain(1)
+
+    const loadPromises: Promise<void>[] = []
+    for (const [midiStr, filename] of Object.entries(sampleMap)) {
+      const midi = Number(midiStr)
+      const url = `${baseUrl}${filename}`
+      const player = new Tone.Player().connect(this.output)
+      this.players.set(midi, player)
+      loadPromises.push(
+        player.load(url).then(() => { /* loaded */ })
+      )
+    }
+
+    this.readyPromise = Promise.all(loadPromises).then(() => {
+      this.ready = true
+    })
+  }
+
+  private noteToMidi(note: string): number {
+    return Tone.Frequency(note).toMidi()
+  }
+
+  triggerAttack(note: string, time: number, velocity: number) {
+    if (!this.ready) return
+    const midi = this.noteToMidi(note)
+    const player = this.players.get(midi)
+    if (player) {
+      player.volume.value = Tone.gainToDb(velocity)
+      player.start(time)
+    }
+  }
+
+  triggerRelease(_note: string, _time: number) {
+    // One-shots — no-op
+  }
+
+  triggerAttackRelease(note: string, _duration: number | string, time: number, velocity: number) {
+    this.triggerAttack(note, time, velocity)
+  }
+
+  releaseAll() {
+    for (const player of this.players.values()) {
+      player.stop()
+    }
+  }
+
+  connect(dest: Tone.InputNode) {
+    this.output.connect(dest)
+    return this
+  }
+
+  dispose() {
+    for (const player of this.players.values()) {
+      player.dispose()
+    }
+    this.players.clear()
+    this.output.dispose()
+  }
+
+  whenReady(): Promise<void> {
+    return this.readyPromise
+  }
+}
+
 export function createSynthFromPreset(preset: InstrumentPreset): SynthAdapter {
+  if (preset.synthType === 'Sampler' && preset.sampleMap) {
+    return new DrumKitAdapter(preset.sampleMap, preset.baseUrl ?? '')
+  }
   if (preset.polyphonic) {
     return new PolySynthAdapter(preset.synthType, preset.synthOptions)
   }
@@ -263,11 +342,28 @@ class AudioEngine {
     const preset = getPreset(presetId)
     const synth = createSynthFromPreset(preset).connect(this.masterGain)
 
-    const note = Tone.Frequency(preset.previewNote ?? 60, 'midi').toNote()
+    // Wait for drum buffers if this is a sampler preset
+    if (synth instanceof DrumKitAdapter) {
+      await synth.whenReady()
+    }
+
     const now = Tone.now() + 0.05
 
-    if (['drums', 'fx'].includes(preset.category) || !preset.polyphonic) {
+    if (preset.synthType === 'Sampler' && preset.sampleMap) {
+      // Drum kit preview: kick-hat-snare-hat pattern
+      const pattern = [36, 42, 38, 42] // kick, closed hat, snare, closed hat
+      const spacing = 0.15
+      for (let i = 0; i < pattern.length; i++) {
+        synth.triggerAttackRelease(
+          Tone.Frequency(pattern[i], 'midi').toNote(),
+          0.1, now + i * spacing, 0.7,
+        )
+      }
+      setTimeout(() => synth.dispose(), 2000)
+    } else if (['drums', 'fx'].includes(preset.category) || !preset.polyphonic) {
+      const note = Tone.Frequency(preset.previewNote ?? 60, 'midi').toNote()
       synth.triggerAttackRelease(note, 0.3, now, 0.7)
+      setTimeout(() => synth.dispose(), 1500)
     } else {
       // Play a major chord
       const root = preset.previewNote ?? 60
@@ -275,9 +371,8 @@ class AudioEngine {
       for (const p of notes) {
         synth.triggerAttackRelease(Tone.Frequency(p, 'midi').toNote(), 0.5, now, 0.6)
       }
+      setTimeout(() => synth.dispose(), 1500)
     }
-
-    setTimeout(() => synth.dispose(), 1500)
   }
 
   // ── Track params ──────────────────────────────────────────────────────────

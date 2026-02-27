@@ -17,6 +17,7 @@ export type SynthType =
   | 'MetalSynth'
   | 'PluckSynth'
   | 'NoiseSynth'
+  | 'Sampler'
 
 export type PresetCategory =
   | 'keys'
@@ -37,6 +38,8 @@ export interface InstrumentPreset {
   polyphonic: boolean
   synthOptions: Record<string, unknown>
   previewNote?: number   // MIDI note for preview (default 60)
+  sampleMap?: Record<number, string>  // MIDI pitch → sample filename (for Sampler type)
+  baseUrl?: string                     // base path for samples (for Sampler type)
 }
 
 export interface PresetCategoryMeta {
@@ -522,6 +525,30 @@ export const PRESETS: InstrumentPreset[] = [
     synthOptions: {
       noise: { type: 'white' },
       envelope: { attack: 0.001, decay: 0.15, sustain: 0, release: 0.1 },
+    },
+  },
+  {
+    id: 'acoustic-kit',
+    name: 'Acoustic Kit',
+    category: 'drums',
+    icon: '🥁',
+    synthType: 'Sampler',
+    polyphonic: true,
+    previewNote: 36,
+    synthOptions: {},
+    baseUrl: '/samples/drums/acoustic/',
+    sampleMap: {
+      36: 'kick.wav',
+      37: 'snare-rim.wav',
+      38: 'snare.wav',
+      39: 'clap.wav',
+      42: 'hihat-closed.wav',
+      45: 'tom-low.wav',
+      46: 'hihat-open.wav',
+      47: 'tom-mid.wav',
+      49: 'crash.wav',
+      50: 'tom-high.wav',
+      51: 'ride.wav',
     },
   },
 
