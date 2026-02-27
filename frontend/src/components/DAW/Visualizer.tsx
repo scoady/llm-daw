@@ -1,8 +1,7 @@
 /**
- * Visualizer — Radial spectrum analyzer behind the Mixer tab.
- * 128 FFT bins mapped to a 270° arc with mirrored symmetry.
- * Inner ring displays detected chord / active notes.
- * Radial particles burst outward from high-amplitude bars.
+ * Visualizer — Radial spectrum analyzer with large chord + note display.
+ * Left side: 128-bin FFT arc (mirrored) with chord in center ring.
+ * Right side: Big flashy note panel with animated tiles and chord badge.
  * CRT scan-line / vignette overlay for retro feel.
  */
 import { useRef, useEffect } from 'react'
@@ -12,10 +11,12 @@ import { midiToNoteName } from '@/services/midiService'
 
 // ─── Timing ──────────────────────────────────────────────────────────────────
 const FRAME_INTERVAL = 1000 / 30 // ~30 fps
-const NOTE_FADE_MS = 400
+const NOTE_FADE_MS = 500
 const PEAK_DECAY_MS = 500
 const PARTICLE_LIFETIME_MS = 800
 const MAX_PARTICLES = 80
+const NOTE_APPEAR_MS = 180 // scale-in animation duration
+const NOTE_PULSE_MS = 120  // velocity pulse duration
 
 // ─── Geometry ────────────────────────────────────────────────────────────────
 const BIN_COUNT = 64 // half — mirrored for 128 visual bars
@@ -24,10 +25,15 @@ const ARC_DEG = 270 // degrees of the arc
 const ARC_START = (90 + (360 - ARC_DEG) / 2) * (Math.PI / 180) // start angle (rad)
 const ARC_END = ARC_START + ARC_DEG * (Math.PI / 180)
 
-// Radius multipliers (of Math.min(w,h)/2)
+// Radius multipliers (of Math.min(spectrumWidth, h)/2)
 const R_INNER = 0.18
 const R_BAR_BASE = 0.22
 const R_BAR_MAX = 0.48
+
+// Layout split: spectrum takes left portion, notes panel takes right
+const SPECTRUM_X_FRAC = 0.32  // center X of spectrum as fraction of canvas width
+const PANEL_LEFT_FRAC = 0.58  // where the note panel starts
+const PANEL_RIGHT_FRAC = 0.97 // where the note panel ends
 
 // ─── Palette ─────────────────────────────────────────────────────────────────
 const PALETTE = [
@@ -35,6 +41,22 @@ const PALETTE = [
   '#c850c0', '#d94fdf', '#ff6bd6', '#ff4fa0', '#ff6b6b',
   '#ff9f43', '#ffd93d', '#6bff6b', '#39ff14', '#00ffc8',
 ]
+
+// Note-specific colors — each pitch class (C, C#, D, ...) gets a unique neon color
+const NOTE_COLORS: Record<number, string> = {
+  0: '#ff4fa0',  // C  — hot pink
+  1: '#ff6b6b',  // C# — coral
+  2: '#ff9f43',  // D  — orange
+  3: '#ffd93d',  // D# — gold
+  4: '#6bff6b',  // E  — green
+  5: '#39ff14',  // F  — neon green
+  6: '#00ffc8',  // F# — cyan-green
+  7: '#00d4ff',  // G  — cyan
+  8: '#3b82f6',  // G# — blue
+  9: '#6c63ff',  // A  — purple
+  10: '#9b59ff', // A# — violet
+  11: '#c850c0', // B  — magenta
+}
 
 /** Deterministic color for a bin index — smooth gradient around the arc. */
 function binToColor(i: number, total: number): string {
@@ -134,6 +156,7 @@ function drawGlowText(
   fontSize: number,
   color: string,
   alpha: number,
+  blur = 18,
 ) {
   ctx.font = `bold ${fontSize}px "Share Tech Mono", monospace`
   ctx.textAlign = 'center'
@@ -142,7 +165,7 @@ function drawGlowText(
   // Glow pass
   ctx.save()
   ctx.shadowColor = color
-  ctx.shadowBlur = 18
+  ctx.shadowBlur = blur
   ctx.globalAlpha = alpha * 0.6
   ctx.fillStyle = color
   ctx.fillText(text, x, y)
@@ -197,6 +220,31 @@ function drawRadialBar(
   ctx.globalAlpha = 1
 }
 
+/** Ease-out bounce for note appearance. */
+function easeOutBack(x: number): number {
+  const c1 = 1.70158
+  const c3 = c1 + 1
+  return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2)
+}
+
+/** Draw rounded rect. */
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number, r: number,
+) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.lineTo(x + w - r, y)
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+  ctx.lineTo(x + w, y + h - r)
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+  ctx.lineTo(x + r, y + h)
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+  ctx.lineTo(x, y + r)
+  ctx.quadraticCurveTo(x, y, x + r, y)
+  ctx.closePath()
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function Visualizer() {
@@ -224,14 +272,18 @@ export function Visualizer() {
   // Idle rotation angle
   const idleAngleRef = useRef(0)
 
+  // Last detected chord for display persistence
+  const lastChordRef = useRef<string | null>(null)
+  const lastChordTimeRef = useRef(0)
+
   // ── MIDI subscription ──────────────────────────────────────────────────────
   useEffect(() => {
     const unsubOn = midiInputService.onNoteOn((evt) => {
       fadingNotesRef.current = fadingNotesRef.current.filter(f => f.pitch !== evt.pitch)
-      const ci = evt.pitch % PALETTE.length
+      const ci = evt.pitch % 12
       activeNotesRef.current.set(evt.pitch, {
         velocity: evt.velocity,
-        color: PALETTE[ci],
+        color: NOTE_COLORS[ci] ?? PALETTE[evt.pitch % PALETTE.length],
         startTime: performance.now(),
       })
     })
@@ -290,9 +342,11 @@ export function Visualizer() {
       const t = timeRef.current
       const now = performance.now()
 
-      const cx = w / 2
+      // ── Layout calculations ───────────────────────────────────────────
+      const cx = w * SPECTRUM_X_FRAC
       const cy = h / 2
-      const radius = Math.min(w, h) / 2
+      const spectrumSize = Math.min(w * 0.55, h)
+      const radius = spectrumSize / 2
       const rBase = radius * R_BAR_BASE
       const rMax = radius * R_BAR_MAX
       const rInner = radius * R_INNER
@@ -301,6 +355,12 @@ export function Visualizer() {
       const smooth = smoothRef.current
       const peaks = peaksRef.current
       const peakTimes = peakTimesRef.current
+
+      // Note panel bounds
+      const panelX = w * PANEL_LEFT_FRAC
+      const panelY = h * 0.06
+      const panelW = w * (PANEL_RIGHT_FRAC - PANEL_LEFT_FRAC)
+      const panelH = h * 0.88
 
       // ── Compute bin levels ────────────────────────────────────────────
       const usableBins = binCount - DC_SKIP
@@ -337,8 +397,6 @@ export function Visualizer() {
       ctx.clearRect(0, 0, w, h)
 
       // ── 2. Radial frequency bars (mirrored) ──────────────────────────
-      // Left half: bins 0..63 go clockwise from ARC_START to midpoint
-      // Right half: mirror of left (bins 0..63 go counter-clockwise from ARC_END)
       const midAngle = (ARC_START + ARC_END) / 2
 
       for (let i = 0; i < BIN_COUNT; i++) {
@@ -367,7 +425,6 @@ export function Visualizer() {
             ctx.shadowColor = color
             ctx.shadowBlur = 10
             ctx.globalAlpha = level * 0.4
-            // Small bright arc at tip
             ctx.beginPath()
             ctx.arc(cx, cy, rOuter, angleL - barAngle * 0.3, angleL + barAngle * 0.3)
             ctx.strokeStyle = color
@@ -412,7 +469,7 @@ export function Visualizer() {
         ctx.globalAlpha = 1
       }
 
-      // ── 4. Inner ring + chord/note display ────────────────────────────
+      // ── 4. Inner ring + chord display ─────────────────────────────────
       // Ring
       const ringAlpha = isIdle ? 0.08 + Math.sin(t * 0.5) * 0.03 : 0.12 + totalEnergy * 0.15
       ctx.beginPath()
@@ -442,12 +499,12 @@ export function Visualizer() {
 
         ctx.beginPath()
         ctx.arc(cx, cy, rBase - 5, 0, Math.PI * 2)
-        ctx.arc(cx, cy, rInner, 0, Math.PI * 2, true) // counter-clockwise for ring
+        ctx.arc(cx, cy, rInner, 0, Math.PI * 2, true)
         ctx.fillStyle = idleGrad
         ctx.fill()
       }
 
-      // Chord and note text
+      // Chord text in center of ring — BIG
       const activePitches = [...activeNotesRef.current.keys()]
       const chord = detectChord(activePitches)
 
@@ -456,42 +513,282 @@ export function Visualizer() {
         f => now - f.fadeStart < NOTE_FADE_MS
       )
 
+      // Track chord for persistence (show last chord briefly after release)
       if (chord) {
-        drawGlowText(ctx, chord, cx, cy - 8, 28, '#ffffff', 0.9)
+        lastChordRef.current = chord
+        lastChordTimeRef.current = now
       }
 
-      // Note names below chord (or centered if no chord)
-      if (activePitches.length > 0) {
-        const noteNames = activePitches
-          .sort((a, b) => a - b)
-          .map(p => midiToNoteName(p))
-          .join('  ')
-        const noteY = chord ? cy + 18 : cy
-        ctx.globalAlpha = 0.7
-        ctx.fillStyle = '#c0c4d8'
-        ctx.font = '13px "Share Tech Mono", monospace'
-        ctx.textAlign = 'center'
+      const chordAge = now - lastChordTimeRef.current
+      const showChord = chord || (lastChordRef.current && chordAge < 800)
+      const chordAlpha = chord ? 0.95 : Math.max(0, 1 - chordAge / 800) * 0.6
+
+      if (showChord && lastChordRef.current) {
+        // Big chord in center ring
+        const chordFontSize = Math.max(28, Math.min(48, radius * 0.32))
+        drawGlowText(ctx, lastChordRef.current, cx, cy, chordFontSize, '#6c63ff', chordAlpha, 24)
+      }
+
+      // ── 5. NOTE DISPLAY PANEL (right side) ────────────────────────────
+      // Panel background
+      ctx.save()
+      roundRect(ctx, panelX, panelY, panelW, panelH, 12)
+      ctx.fillStyle = 'rgba(10, 10, 18, 0.55)'
+      ctx.fill()
+
+      // Panel border glow
+      roundRect(ctx, panelX, panelY, panelW, panelH, 12)
+      ctx.strokeStyle = 'rgba(108, 99, 255, 0.18)'
+      ctx.lineWidth = 1.5
+      ctx.stroke()
+
+      // Subtle inner shadow at top
+      const panelTopGrad = ctx.createLinearGradient(panelX, panelY, panelX, panelY + 40)
+      panelTopGrad.addColorStop(0, 'rgba(108, 99, 255, 0.06)')
+      panelTopGrad.addColorStop(1, 'transparent')
+      roundRect(ctx, panelX, panelY, panelW, 40, 12)
+      ctx.fillStyle = panelTopGrad
+      ctx.fill()
+      ctx.restore()
+
+      // "NOTES" header label
+      ctx.globalAlpha = 0.35
+      ctx.fillStyle = '#c0c4d8'
+      ctx.font = `bold ${Math.max(10, panelH * 0.04)}px "Space Grotesk", sans-serif`
+      ctx.textAlign = 'left'
+      ctx.textBaseline = 'top'
+      ctx.fillText('NOTES', panelX + 16, panelY + 12)
+      ctx.globalAlpha = 1
+
+      // Chord badge at top-right of panel
+      if (showChord && lastChordRef.current) {
+        const badgeFontSize = Math.max(18, Math.min(36, panelH * 0.1))
+        const badgeX = panelX + panelW - 20
+        const badgeY = panelY + 14 + badgeFontSize * 0.4
+
+        // Badge background pill
+        ctx.save()
+        const badgeText = lastChordRef.current
+        ctx.font = `bold ${badgeFontSize}px "Share Tech Mono", monospace`
+        const badgeMetrics = ctx.measureText(badgeText)
+        const bw = badgeMetrics.width + 24
+        const bh = badgeFontSize + 12
+
+        roundRect(ctx, badgeX - bw, badgeY - bh / 2, bw, bh, bh / 2)
+        ctx.fillStyle = 'rgba(108, 99, 255, 0.2)'
+        ctx.fill()
+        roundRect(ctx, badgeX - bw, badgeY - bh / 2, bw, bh, bh / 2)
+        ctx.strokeStyle = `rgba(108, 99, 255, ${0.3 * chordAlpha})`
+        ctx.lineWidth = 1.5
+        ctx.stroke()
+
+        // Badge text
+        ctx.globalAlpha = chordAlpha
+        ctx.fillStyle = '#ffffff'
+        ctx.font = `bold ${badgeFontSize}px "Share Tech Mono", monospace`
+        ctx.textAlign = 'right'
         ctx.textBaseline = 'middle'
-        ctx.fillText(noteNames, cx, noteY)
+        ctx.shadowColor = '#6c63ff'
+        ctx.shadowBlur = 14
+        ctx.fillText(badgeText, badgeX - 12, badgeY)
+        ctx.shadowBlur = 0
+        ctx.restore()
         ctx.globalAlpha = 1
-      } else if (fadingNotesRef.current.length > 0) {
-        // Show fading note names
-        const fadeAlpha = Math.max(
-          ...fadingNotesRef.current.map(f => Math.max(0, 1 - (now - f.fadeStart) / NOTE_FADE_MS))
+      }
+
+      // ── Note tiles ───────────────────────────────────────────────────
+      const tileAreaY = panelY + panelH * 0.16
+      const tileAreaH = panelH * 0.78
+      const tileInnerW = panelW - 32
+      const tileX0 = panelX + 16
+
+      // Gather all notes to display: active + fading
+      interface DisplayNote {
+        pitch: number
+        name: string
+        color: string
+        alpha: number
+        scale: number
+        velocity: number
+        isActive: boolean
+        pulsePhase: number // 0-1, for velocity pulse
+      }
+
+      const displayNotes: DisplayNote[] = []
+
+      // Active notes
+      for (const [pitch, note] of activeNotesRef.current.entries()) {
+        const age = now - note.startTime
+        const appearFrac = Math.min(1, age / NOTE_APPEAR_MS)
+        const scale = easeOutBack(appearFrac)
+        const pulseFrac = Math.min(1, age / NOTE_PULSE_MS)
+        const pulsePhase = 1 - pulseFrac // 1→0
+        displayNotes.push({
+          pitch,
+          name: midiToNoteName(pitch),
+          color: note.color,
+          alpha: 1,
+          scale,
+          velocity: note.velocity,
+          isActive: true,
+          pulsePhase,
+        })
+      }
+
+      // Fading notes
+      for (const f of fadingNotesRef.current) {
+        const fadeAge = now - f.fadeStart
+        const fadeFrac = fadeAge / NOTE_FADE_MS
+        const alpha = Math.max(0, 1 - fadeFrac)
+        const scale = 1 - fadeFrac * 0.4 // shrink to 60%
+        displayNotes.push({
+          pitch: f.pitch,
+          name: midiToNoteName(f.pitch),
+          color: f.color,
+          alpha,
+          scale,
+          velocity: f.velocity,
+          isActive: false,
+          pulsePhase: 0,
+        })
+      }
+
+      // Sort by pitch for consistent layout
+      displayNotes.sort((a, b) => a.pitch - b.pitch)
+
+      if (displayNotes.length > 0) {
+        // Calculate tile size to fill available space
+        const maxCols = Math.min(4, displayNotes.length)
+        const rows = Math.ceil(displayNotes.length / maxCols)
+        const cols = Math.min(maxCols, displayNotes.length)
+
+        const tileGap = 8
+        const tileW = Math.min(
+          (tileInnerW - (cols - 1) * tileGap) / cols,
+          tileAreaH * 0.4
         )
-        const noteNames = fadingNotesRef.current
-          .map(f => midiToNoteName(f.pitch))
-          .join('  ')
-        ctx.globalAlpha = fadeAlpha * 0.5
+        const tileH = Math.min(
+          (tileAreaH - (rows - 1) * tileGap) / rows,
+          tileW * 1.1
+        )
+        const tileFontSize = Math.max(18, Math.min(42, tileH * 0.45))
+        const octaveFontSize = Math.max(10, tileFontSize * 0.45)
+
+        // Center the grid
+        const gridW = cols * tileW + (cols - 1) * tileGap
+        const gridH = rows * tileH + (rows - 1) * tileGap
+        const gridX0 = tileX0 + (tileInnerW - gridW) / 2
+        const gridY0 = tileAreaY + (tileAreaH - gridH) / 2
+
+        for (let idx = 0; idx < displayNotes.length; idx++) {
+          const dn = displayNotes[idx]
+          const col = idx % cols
+          const row = Math.floor(idx / cols)
+
+          const tx = gridX0 + col * (tileW + tileGap)
+          const ty = gridY0 + row * (tileH + tileGap)
+          const tcx = tx + tileW / 2
+          const tcy = ty + tileH / 2
+
+          ctx.save()
+
+          // Apply scale transform from center of tile
+          ctx.translate(tcx, tcy)
+          ctx.scale(dn.scale, dn.scale)
+          ctx.translate(-tcx, -tcy)
+
+          // Tile background
+          ctx.globalAlpha = dn.alpha * 0.85
+          roundRect(ctx, tx, ty, tileW, tileH, 8)
+
+          // Glow fill behind tile
+          const tileGrad = ctx.createRadialGradient(
+            tcx, tcy, 0,
+            tcx, tcy, tileW * 0.8,
+          )
+          tileGrad.addColorStop(0, dn.color + '30') // 19% opacity
+          tileGrad.addColorStop(1, 'rgba(10, 10, 18, 0.8)')
+          ctx.fillStyle = tileGrad
+          ctx.fill()
+
+          // Tile border
+          roundRect(ctx, tx, ty, tileW, tileH, 8)
+          ctx.strokeStyle = dn.color
+          ctx.lineWidth = dn.isActive ? 2 : 1
+          ctx.globalAlpha = dn.alpha * (dn.isActive ? 0.7 : 0.3)
+          ctx.stroke()
+
+          // Velocity pulse — bright flash on note-on
+          if (dn.pulsePhase > 0) {
+            roundRect(ctx, tx, ty, tileW, tileH, 8)
+            ctx.fillStyle = dn.color
+            ctx.globalAlpha = dn.pulsePhase * 0.25 * (dn.velocity / 127)
+            ctx.fill()
+          }
+
+          // Note name (e.g., "C#")
+          const noteParts = dn.name.match(/^([A-G]#?)(\d+)$/)
+          const noteLetter = noteParts ? noteParts[1] : dn.name
+          const noteOctave = noteParts ? noteParts[2] : ''
+
+          // Glow
+          ctx.save()
+          ctx.shadowColor = dn.color
+          ctx.shadowBlur = 16
+          ctx.globalAlpha = dn.alpha * 0.5
+          ctx.fillStyle = dn.color
+          ctx.font = `bold ${tileFontSize}px "Share Tech Mono", monospace`
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(noteLetter, tcx, tcy - octaveFontSize * 0.3)
+          ctx.restore()
+
+          // Sharp note text
+          ctx.globalAlpha = dn.alpha * 0.95
+          ctx.fillStyle = '#ffffff'
+          ctx.font = `bold ${tileFontSize}px "Share Tech Mono", monospace`
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(noteLetter, tcx, tcy - octaveFontSize * 0.3)
+
+          // Octave number below
+          ctx.globalAlpha = dn.alpha * 0.5
+          ctx.fillStyle = dn.color
+          ctx.font = `${octaveFontSize}px "Share Tech Mono", monospace`
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(noteOctave, tcx, tcy + tileFontSize * 0.4)
+
+          // Velocity bar at bottom of tile
+          if (dn.isActive) {
+            const barH = 3
+            const barY = ty + tileH - 8
+            const velFrac = dn.velocity / 127
+            const barW2 = (tileW - 16) * velFrac
+            ctx.globalAlpha = dn.alpha * 0.6
+            roundRect(ctx, tx + 8, barY, tileW - 16, barH, 1.5)
+            ctx.fillStyle = 'rgba(255,255,255,0.08)'
+            ctx.fill()
+            roundRect(ctx, tx + 8, barY, barW2, barH, 1.5)
+            ctx.fillStyle = dn.color
+            ctx.fill()
+          }
+
+          ctx.restore()
+        }
+      } else {
+        // Empty state — subtle hint
+        ctx.globalAlpha = 0.15
         ctx.fillStyle = '#c0c4d8'
-        ctx.font = '13px "Share Tech Mono", monospace'
+        const hintSize = Math.max(12, panelH * 0.045)
+        ctx.font = `${hintSize}px "Space Grotesk", sans-serif`
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
-        ctx.fillText(noteNames, cx, cy)
+        ctx.fillText('Play notes to see them here', panelX + panelW / 2, panelY + panelH / 2)
         ctx.globalAlpha = 1
       }
 
-      // ── 5. Radial particles ───────────────────────────────────────────
+      // ── 6. Radial particles ───────────────────────────────────────────
       // Spawn particles from high-amplitude bar tips
       if (!isIdle) {
         for (let i = 0; i < BIN_COUNT; i++) {
@@ -546,7 +843,7 @@ export function Visualizer() {
       particlesRef.current = aliveParticles
       ctx.globalAlpha = 1
 
-      // ── 6. CRT overlay: scan-lines + vignette ────────────────────────
+      // ── 7. CRT overlay: scan-lines + vignette ────────────────────────
       scanLineOffset.current = (scanLineOffset.current + 0.3) % 4
       ctx.fillStyle = 'rgba(255, 255, 255, 0.012)'
       for (let y = scanLineOffset.current; y < h; y += 4) {
