@@ -12,6 +12,7 @@ import { audioEngine } from '@/services/audioEngine'
 import { midiToNoteName, isBlackKey } from '@/services/midiService'
 import { Button } from '@/components/common/Button'
 import { LEDIndicator } from '@/components/common/LEDIndicator'
+import { LogoIcon } from '@/components/common/LogoIcon'
 import type { Note, Suggestion } from '@/types'
 import * as Tone from 'tone'
 
@@ -129,8 +130,8 @@ function Oscilloscope({ active }: { active: boolean }) {
       {/* Corner label */}
       <div className="absolute top-1 left-2 flex items-center gap-1.5">
         <Activity size={8} className="text-accent/50" />
-        <span className="text-[9px] font-lcd text-accent/40 uppercase tracking-wider">
-          Neural Scope
+        <span className="text-[9px] font-medium text-accent/40 uppercase tracking-wider">
+          Signal
         </span>
       </div>
     </div>
@@ -328,7 +329,7 @@ function SuggestionCard({ suggestion, index }: { suggestion: Suggestion; index: 
             {/* Header */}
             <div className="flex items-center gap-2 px-3 py-2 border-b border-border-subtle/50">
               <div
-                className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[9px] font-lcd font-medium uppercase tracking-wider"
+                className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[9px] font-medium uppercase tracking-wider"
                 style={{ color: config.color, backgroundColor: config.bgColor }}
               >
                 <TypeIcon size={9} />
@@ -349,17 +350,17 @@ function SuggestionCard({ suggestion, index }: { suggestion: Suggestion; index: 
 
             {/* Stats */}
             <div className="px-3 pb-2 flex items-center gap-3">
-              <span className="text-[9px] font-lcd text-text-muted">
-                <span className="text-accent" style={{ textShadow: '0 0 4px rgba(108,99,255,0.5)' }}>
+              <span className="text-[9px] text-text-muted">
+                <span className="font-mono text-accent" style={{ textShadow: '0 0 4px rgba(108,99,255,0.5)' }}>
                   {suggestion.notes.length}
                 </span>{' '}
-                NOTES
+                notes
               </span>
-              <span className="text-[9px] font-lcd text-text-muted">
-                <span className="text-accent" style={{ textShadow: '0 0 4px rgba(108,99,255,0.5)' }}>
+              <span className="text-[9px] text-text-muted">
+                <span className="font-mono text-accent" style={{ textShadow: '0 0 4px rgba(108,99,255,0.5)' }}>
                   {suggestion.durationBeats}
                 </span>{' '}
-                BEATS
+                beats
               </span>
             </div>
 
@@ -501,10 +502,10 @@ function AIThinking() {
       </div>
       <div className="flex items-center gap-2">
         <LEDIndicator on color="accent" size="xs" pulse />
-        <span className="text-[10px] font-lcd text-accent uppercase tracking-wider animate-pulse"
+        <span className="text-[10px] font-medium text-accent uppercase tracking-wider animate-pulse"
           style={{ textShadow: '0 0 6px rgba(108,99,255,0.5)' }}
         >
-          Neural analysis in progress
+          Analyzing
         </span>
       </div>
     </div>
@@ -597,11 +598,11 @@ export function AIPanel() {
         style={{ background: 'linear-gradient(180deg, #12151e 0%, #0d1018 100%)' }}
       >
         <LEDIndicator on color="accent" size="xs" pulse />
-        <Sparkles size={13} className="text-accent" style={{ filter: 'drop-shadow(0 0 4px rgba(108,99,255,0.5))' }} />
-        <h2 className="text-xs font-lcd text-accent uppercase tracking-[0.15em] flex-1"
+        <LogoIcon size={16} color="#6c63ff" glow glowColor="rgba(108,99,255,0.5)" />
+        <h2 className="text-xs font-semibold text-accent uppercase tracking-[0.12em] flex-1"
           style={{ textShadow: '0 0 8px rgba(108,99,255,0.4)' }}
         >
-          AI Neural Engine
+          AI Assist
         </h2>
         <button
           onClick={() => useDAWStore.getState().setAIPanelOpen(false)}
@@ -620,11 +621,11 @@ export function AIPanel() {
         {/* Input Section */}
         <div className="p-4 space-y-3 border-b border-border-subtle/50">
           <div className="flex items-center justify-between">
-            <span className="text-[9px] text-text-muted uppercase tracking-[0.15em] font-lcd font-medium">
-              Input Signal
+            <span className="text-[9px] text-text-muted uppercase tracking-[0.12em] font-medium">
+              Input
             </span>
-            <span className="text-[9px] font-lcd text-text-muted">
-              <span className="text-accent">{allNotes.length}</span> notes{' '}
+            <span className="text-[9px] text-text-muted">
+              <span className="font-mono text-accent">{allNotes.length}</span> notes{' '}
               {selectedClipId ? '(clip)' : '(all)'}
             </span>
           </div>
@@ -635,7 +636,7 @@ export function AIPanel() {
               {[...new Set(allNotes.map((n) => midiToNoteName(n.pitch)))].slice(0, 12).map((name) => (
                 <span
                   key={name}
-                  className="text-[9px] px-1.5 py-0.5 rounded font-lcd text-accent/80"
+                  className="text-[9px] px-1.5 py-0.5 rounded font-mono text-accent/80"
                   style={{
                     background: 'rgba(108, 99, 255, 0.08)',
                     border: '1px solid rgba(108, 99, 255, 0.15)',
@@ -650,8 +651,8 @@ export function AIPanel() {
 
         {/* Prompt Section */}
         <div className="p-4 space-y-3 border-b border-border-subtle/50">
-          <span className="text-[9px] text-text-muted uppercase tracking-[0.15em] font-lcd font-medium">
-            Command Input
+          <span className="text-[9px] text-text-muted uppercase tracking-[0.12em] font-medium">
+            Prompt
           </span>
 
           <div className="relative group">
@@ -662,7 +663,7 @@ export function AIPanel() {
               onKeyDown={handleKeyDown}
               placeholder="What should AI do with these notes?"
               rows={3}
-              className="w-full rounded-md px-3 py-2 text-xs text-text-primary font-lcd
+              className="w-full rounded-md px-3 py-2 text-xs text-text-primary
                          placeholder:text-text-muted/50 resize-none
                          focus:outline-none transition-all"
               style={{
@@ -705,7 +706,7 @@ export function AIPanel() {
                   setPrompt(qp)
                   textareaRef.current?.focus()
                 }}
-                className="text-[9px] px-2 py-1 rounded font-lcd text-text-muted transition-all
+                className="text-[9px] px-2 py-1 rounded text-text-muted transition-all
                            hover:text-accent hover:border-accent/30"
                 style={{
                   background: 'rgba(108, 99, 255, 0.04)',
@@ -747,7 +748,7 @@ export function AIPanel() {
             }}
           >
             <LEDIndicator on color="red" size="xs" />
-            <p className="text-xs text-neon-red font-lcd">{error}</p>
+            <p className="text-xs text-neon-red">{error}</p>
           </div>
         )}
 
@@ -756,7 +757,7 @@ export function AIPanel() {
           <div className="p-4 space-y-3 border-b border-border-subtle/50">
             <div className="flex items-center gap-2">
               <LEDIndicator on color="green" size="xs" />
-              <span className="text-[9px] text-text-muted uppercase tracking-[0.15em] font-lcd font-medium">
+              <span className="text-[9px] text-text-muted uppercase tracking-[0.12em] font-medium">
                 Analysis Complete
               </span>
             </div>
@@ -771,8 +772,8 @@ export function AIPanel() {
                   boxShadow: 'inset 0 0 12px rgba(0, 212, 255, 0.03)',
                 }}
               >
-                <span className="text-[9px] text-text-muted font-lcd uppercase tracking-wider block">Key</span>
-                <span className="text-sm font-bold font-lcd text-cyan"
+                <span className="text-[9px] text-text-muted uppercase tracking-wider block">Key</span>
+                <span className="text-sm font-bold font-mono text-cyan"
                   style={{ textShadow: '0 0 8px rgba(0, 212, 255, 0.4)' }}
                 >
                   {analysis.key} {analysis.scale}
@@ -787,8 +788,8 @@ export function AIPanel() {
                   boxShadow: 'inset 0 0 12px rgba(108, 99, 255, 0.03)',
                 }}
               >
-                <span className="text-[9px] text-text-muted font-lcd uppercase tracking-wider block">Tempo</span>
-                <span className="text-sm font-bold font-lcd text-accent"
+                <span className="text-[9px] text-text-muted uppercase tracking-wider block">Tempo</span>
+                <span className="text-sm font-bold font-mono text-accent"
                   style={{ textShadow: '0 0 8px rgba(108, 99, 255, 0.4)' }}
                 >
                   {analysis.tempo} BPM
@@ -806,12 +807,12 @@ export function AIPanel() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <LEDIndicator on color="cyan" size="xs" />
-                <span className="text-[9px] text-text-muted uppercase tracking-[0.15em] font-lcd font-medium">
+                <span className="text-[9px] text-text-muted uppercase tracking-[0.12em] font-medium">
                   Suggestions
                 </span>
               </div>
-              <span className="text-[9px] font-lcd text-accent">
-                {suggestions.length} IDEAS
+              <span className="text-[9px] font-mono text-accent">
+                {suggestions.length}
               </span>
             </div>
 
@@ -834,15 +835,15 @@ export function AIPanel() {
                 boxShadow: '0 0 20px rgba(108, 99, 255, 0.08)',
               }}
             >
-              <Sparkles size={24} className="text-accent" style={{ filter: 'drop-shadow(0 0 6px rgba(108,99,255,0.5))' }} />
+              <LogoIcon size={28} color="#6c63ff" glow />
             </div>
             <h3
-              className="text-sm font-lcd font-medium text-accent mb-2 uppercase tracking-wider"
+              className="text-sm font-semibold text-accent mb-2 uppercase tracking-wide"
               style={{ textShadow: '0 0 8px rgba(108,99,255,0.3)' }}
             >
-              AI Neural Engine
+              AI Assist
             </h3>
-            <p className="text-[10px] text-text-muted leading-relaxed max-w-[240px] font-lcd">
+            <p className="text-[10px] text-text-muted leading-relaxed max-w-[240px]">
               Play some notes on your MIDI keyboard, then ask AI to analyze, harmonize,
               or continue your melody.
             </p>
