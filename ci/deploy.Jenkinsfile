@@ -43,7 +43,7 @@ pipeline {
       steps {
         container('helm') {
           sh """
-            helm upgrade llm-daw \${WORKSPACE}/infrastructure/helm/llm-daw \\
+            helm upgrade --install llm-daw \${WORKSPACE}/infrastructure/helm/llm-daw \\
               --namespace llm-daw \\
               --create-namespace \\
               --values \${WORKSPACE}/infrastructure/helm/llm-daw/values.yaml \\
@@ -79,8 +79,7 @@ pipeline {
       echo "LLM-DAW deployed successfully. Tag: ${params.IMAGE_TAG}"
     }
     failure {
-      echo "Deployment failed for tag=${params.IMAGE_TAG}."
-      sh "helm history llm-daw -n llm-daw --max 5 || true"
+      echo "Deployment failed for tag=${params.IMAGE_TAG}. Check Helm output above."
     }
   }
 }
