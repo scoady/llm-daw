@@ -1,12 +1,11 @@
 import axios from 'axios'
 import type { Project, Track, Note, AnalysisResult, Suggestion } from '@/types'
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000'
+const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
 const api = axios.create({
   baseURL: API_BASE,
   headers: { 'Content-Type': 'application/json' },
-  withCredentials: true,
 })
 
 // ─── Auth interceptor ─────────────────────────────────────────────────────────
