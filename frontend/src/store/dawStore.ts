@@ -506,7 +506,7 @@ export const useDAWStore = create<DAWState & DAWActions>()(
     // ── Library
     insertLibraryClip: (libClip, trackId) => {
       const state = get()
-      const targetId = trackId ?? state.selectedTrackId
+      const targetId = trackId ?? state.selectedTrackId ?? state.tracks[0]?.id
       if (!targetId) return
 
       const track = state.tracks.find((t) => t.id === targetId)

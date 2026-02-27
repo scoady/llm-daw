@@ -179,36 +179,57 @@ export async function loadProjectTree(projectId: string) {
 // ─── Library CRUD ───────────────────────────────────────────────────────────
 
 export async function loadLibraryClips(category?: string, search?: string) {
-  let query = 'SELECT lc.*, COUNT(ln.id) AS note_count FROM library_clips lc LEFT JOIN library_notes ln ON ln.clip_id = lc.id'
+  let query = 'SELECT * FROM library_clips'
   const conditions: string[] = []
   const params: unknown[] = []
 
   if (category) {
     params.push(category)
-    conditions.push(`lc.category = $${params.length}`)
+    conditions.push(`category = $${params.length}`)
   }
   if (search) {
     params.push(`%${search}%`)
-    conditions.push(`(lc.name ILIKE $${params.length} OR lc.tags ILIKE $${params.length})`)
+    conditions.push(`(name ILIKE $${params.length} OR tags ILIKE $${params.length})`)
   }
 
   if (conditions.length) query += ' WHERE ' + conditions.join(' AND ')
-  query += ' GROUP BY lc.id ORDER BY lc.created_at DESC'
+  query += ' ORDER BY created_at DESC'
 
   const res = await pool.query(query, params)
-  return res.rows.map((r: Record<string, unknown>) => ({
-    id: r.id,
-    name: r.name,
-    category: r.category,
-    clipType: r.clip_type,
-    durationBeats: r.duration_beats,
-    bpm: r.bpm,
-    color: r.color || undefined,
-    audioFileId: r.audio_file_id || undefined,
-    tags: r.tags || undefined,
-    noteCount: Number(r.note_count),
-    createdAt: r.created_at,
-  }))
+
+  // Fetch notes for all clips in one query
+  const clipIds = res.rows.map((r: Record<string, unknown>) => r.id)
+  let notesByClip = new Map<string, Array<{ id: string; pitch: number; startBeat: number; durationBeats: number; velocity: number }>>()
+
+  if (clipIds.length > 0) {
+    const notesRes = await pool.query(
+      'SELECT * FROM library_notes WHERE clip_id = ANY($1) ORDER BY start_beat',
+      [clipIds]
+    )
+    for (const n of notesRes.rows) {
+      const arr = notesByClip.get(n.clip_id) ?? []
+      arr.push({ id: n.id, pitch: n.pitch, startBeat: n.start_beat, durationBeats: n.duration_beats, velocity: n.velocity })
+      notesByClip.set(n.clip_id, arr)
+    }
+  }
+
+  return res.rows.map((r: Record<string, unknown>) => {
+    const notes = notesByClip.get(r.id as string) ?? []
+    return {
+      id: r.id,
+      name: r.name,
+      category: r.category,
+      clipType: r.clip_type,
+      durationBeats: r.duration_beats,
+      bpm: r.bpm,
+      color: r.color || undefined,
+      audioFileId: r.audio_file_id || undefined,
+      tags: r.tags || undefined,
+      noteCount: notes.length,
+      notes,
+      createdAt: r.created_at,
+    }
+  })
 }
 
 export async function loadLibraryClip(id: string) {

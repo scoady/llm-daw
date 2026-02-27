@@ -3,7 +3,7 @@ import { Search, Music } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useLibraryStore } from '@/store/libraryStore'
 import { useDAWStore } from '@/store/dawStore'
-import { libraryApi } from '@/services/apiClient'
+import { audioEngine } from '@/services/audioEngine'
 import { LibraryClipCard } from './LibraryClipCard'
 import type { LibraryClip, LibraryClipCategory } from '@/types'
 
@@ -22,29 +22,42 @@ export function ClipBrowser() {
     clips, isLoading, selectedCategory, searchQuery, previewingClipId,
     setSelectedCategory, setSearchQuery, setPreviewingClipId, fetchClips,
   } = useLibraryStore()
-  const { insertLibraryClip } = useDAWStore()
+  const { insertLibraryClip, selectedTrackId, tracks, selectTrack } = useDAWStore()
 
   useEffect(() => {
     fetchClips()
   }, [selectedCategory, searchQuery, fetchClips])
 
   const handlePreview = useCallback(async (clip: LibraryClip) => {
+    if (!clip.notes?.length) return
     setPreviewingClipId(clip.id)
-    // For MIDI clips, load full notes for preview if needed
-    if (clip.clipType === 'midi' && !clip.notes) {
-      await libraryApi.get(clip.id)
-    }
-    setTimeout(() => setPreviewingClipId(null), 2000)
-  }, [setPreviewingClipId])
 
-  const handleInsert = useCallback(async (clip: LibraryClip) => {
-    // Fetch full clip with notes if not loaded
-    let fullClip = clip
-    if (clip.clipType === 'midi' && !clip.notes) {
-      fullClip = await libraryApi.get(clip.id)
+    // Find a track to use for the synth, or use a one-shot preview
+    const trackId = selectedTrackId ?? tracks[0]?.id
+    if (trackId) {
+      // Play each note through the audio engine
+      for (const note of clip.notes) {
+        setTimeout(() => {
+          audioEngine.previewNote(note.pitch, trackId)
+        }, (note.startBeat / (clip.bpm / 60)) * 1000)
+      }
     }
-    insertLibraryClip(fullClip)
-  }, [insertLibraryClip])
+
+    const durationMs = (clip.durationBeats / (clip.bpm / 60)) * 1000
+    setTimeout(() => setPreviewingClipId(null), Math.min(durationMs + 500, 4000))
+  }, [setPreviewingClipId, selectedTrackId, tracks])
+
+  const handleInsert = useCallback((clip: LibraryClip) => {
+    // Ensure a track is selected — fall back to first track
+    let targetTrackId = selectedTrackId
+    if (!targetTrackId && tracks.length > 0) {
+      targetTrackId = tracks[0].id
+      selectTrack(targetTrackId)
+    }
+    if (!targetTrackId) return
+
+    insertLibraryClip(clip, targetTrackId)
+  }, [insertLibraryClip, selectedTrackId, tracks, selectTrack])
 
   return (
     <div className="flex flex-col h-full">
