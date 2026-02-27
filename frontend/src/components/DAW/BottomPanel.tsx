@@ -8,6 +8,7 @@ import { LEDIndicator } from '@/components/common/LEDIndicator'
 import { Mixer } from '@/components/DAW/Mixer'
 import { PianoRollEditor } from '@/components/DAW/PianoRollEditor'
 import { MasterEQ } from '@/components/DAW/MasterEQ'
+import { Visualizer } from '@/components/DAW/Visualizer'
 
 type BottomTab = 'mixer' | 'editor' | 'master'
 
@@ -96,7 +97,8 @@ export function BottomPanel() {
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden relative">
+        {bottomTab === 'mixer' && <Visualizer />}
         {bottomTab === 'mixer' && <Mixer />}
         {bottomTab === 'editor' && <PianoRollEditor />}
         {bottomTab === 'master' && <MasterEQ />}

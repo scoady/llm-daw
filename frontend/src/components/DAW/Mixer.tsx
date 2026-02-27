@@ -177,7 +177,7 @@ export function Mixer() {
   const { tracks } = useDAWStore()
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-transparent relative z-10">
       {/* Channel strips */}
       <div className="flex flex-1 overflow-x-auto">
         <MasterStrip />
