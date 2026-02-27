@@ -442,7 +442,7 @@ app.post<{ Body: AnalyzeRequest }>('/api/ai/analyze', async (request, reply) => 
 
   try {
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 4096,
       system: ANALYZE_SYSTEM,
       messages: [
@@ -493,7 +493,7 @@ app.post<{ Body: GenerateRequest }>('/api/ai/generate', async (request, reply) =
 
   try {
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 2048,
       system: GENERATE_SYSTEM,
       messages: [{ role: 'user', content: prompt }],
@@ -528,7 +528,7 @@ app.post<{ Body: AccompanyRequest }>('/api/ai/accompany', async (request, reply)
 
   try {
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 8192,
       system: ACCOMPANY_SYSTEM,
       messages: [
