@@ -543,7 +543,6 @@ export function AIPanel() {
     suggestions,
     setSuggestions,
     clearResults,
-    targetPresetId: aiTargetPresetId,
     setTargetPresetId,
   } = useAIStore()
 
