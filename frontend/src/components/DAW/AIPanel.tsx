@@ -217,11 +217,10 @@ function MiniNotePreview({ notes, height = 48 }: { notes: Note[]; height?: numbe
 // ─── Suggestion Card ────────────────────────────────────────────────────────
 
 function SuggestionCard({ suggestion, index }: { suggestion: Suggestion; index: number }) {
-  const { bpm, tracks, addTrack, addClip, addNote } = useDAWStore()
+  const { bpm, addTrack, addClip, addNote } = useDAWStore()
   const { previewingSuggestionId, setPreviewingSuggestionId } = useAIStore()
   const isPreviewing = previewingSuggestionId === suggestion.id
   const previewSynthRef = useRef<Tone.PolySynth | null>(null)
-  const previewPartRef = useRef<Tone.Part | null>(null)
 
   const typeConfig: Record<string, { color: string; glowColor: string; bgColor: string }> = {
     continuation: { color: '#39ff14', glowColor: 'rgba(57, 255, 20, 0.3)', bgColor: 'rgba(57, 255, 20, 0.08)' },
@@ -242,10 +241,8 @@ function SuggestionCard({ suggestion, index }: { suggestion: Suggestion; index: 
 
   const handlePreview = useCallback(async () => {
     if (isPreviewing) {
-      previewPartRef.current?.stop()
-      previewPartRef.current?.dispose()
+      previewSynthRef.current?.releaseAll()
       previewSynthRef.current?.dispose()
-      previewPartRef.current = null
       previewSynthRef.current = null
       setPreviewingSuggestionId(null)
       return
@@ -260,41 +257,31 @@ function SuggestionCard({ suggestion, index }: { suggestion: Suggestion; index: 
     }).toDestination()
     previewSynthRef.current = synth
 
-    const events = suggestion.notes.map((note) => ({
-      time: note.startBeat * (60 / bpm),
-      note: Tone.Frequency(note.pitch, 'midi').toNote(),
-      duration: note.durationBeats * (60 / bpm),
-      velocity: note.velocity / 127,
-    }))
+    // Schedule directly on audio context (not Transport) so preview works
+    // regardless of transport state
+    const secPerBeat = 60 / bpm
+    const now = Tone.now() + 0.05
+    for (const note of suggestion.notes) {
+      synth.triggerAttackRelease(
+        Tone.Frequency(note.pitch, 'midi').toNote(),
+        note.durationBeats * secPerBeat,
+        now + note.startBeat * secPerBeat,
+        note.velocity / 127,
+      )
+    }
 
-    const part = new Tone.Part((time, event) => {
-      synth.triggerAttackRelease(event.note, event.duration, time, event.velocity)
-    }, events)
-
-    previewPartRef.current = part
-    part.start(Tone.now())
-
-    const totalDuration = suggestion.durationBeats * (60 / bpm)
+    const totalDuration = suggestion.durationBeats * secPerBeat
     setTimeout(() => {
-      part.stop()
-      part.dispose()
       synth.dispose()
-      previewPartRef.current = null
       previewSynthRef.current = null
       setPreviewingSuggestionId(null)
     }, totalDuration * 1000 + 500)
   }, [isPreviewing, suggestion, bpm, setPreviewingSuggestionId])
 
   const handleAddToTrack = useCallback(() => {
-    let track = tracks.find((t) => t.type === 'midi' || t.type === 'instrument')
-    if (!track) {
-      track = addTrack('midi', 'AI Track')
-    }
-
-    const existingEnd = Math.max(0, ...track.clips.map((c) => c.startBeat + c.durationBeats))
-    const startBeat = Math.ceil(existingEnd / 4) * 4
-
-    const clip = addClip(track.id, startBeat, suggestion.durationBeats)
+    // Always create a new track at beat 0
+    const track = addTrack('midi', suggestion.label ?? 'AI Suggestion')
+    const clip = addClip(track.id, 0, suggestion.durationBeats)
 
     for (const note of suggestion.notes) {
       addNote(clip.id, {
@@ -304,7 +291,7 @@ function SuggestionCard({ suggestion, index }: { suggestion: Suggestion; index: 
         velocity: note.velocity,
       })
     }
-  }, [tracks, addTrack, addClip, addNote, suggestion])
+  }, [addTrack, addClip, addNote, suggestion])
 
   return (
     <div
