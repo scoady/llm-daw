@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
-import type { Track, Clip, Note, TransportState, TrackType, MIDIDeviceInfo } from '@/types'
+import type { Track, Clip, Note, TransportState, TrackType, MIDIDeviceInfo, Project } from '@/types'
+import { projectsApi } from '@/services/apiClient'
 
 const TRACK_COLORS = [
   '#6c63ff', '#22c55e', '#f59e0b', '#ef4444',
@@ -53,6 +54,10 @@ interface DAWState {
 
   // AI Panel
   aiPanelOpen: boolean
+
+  // Persistence
+  saveStatus: 'idle' | 'saving' | 'saved' | 'error'
+  lastSavedAt: string | null
 }
 
 interface DAWActions {
@@ -112,6 +117,11 @@ interface DAWActions {
   toggleAIPanel(): void
   setAIPanelOpen(open: boolean): void
 
+  // Persistence
+  saveProject(): Promise<void>
+  loadProject(id: string): Promise<void>
+  createProject(name: string, bpm?: number): Promise<string>
+
   // Bulk hydrate (for project load)
   hydrate(state: Partial<DAWState>): void
 }
@@ -154,6 +164,10 @@ export const useDAWStore = create<DAWState & DAWActions>()(
 
     // AI Panel
     aiPanelOpen: false,
+
+    // Persistence
+    saveStatus: 'idle',
+    lastSavedAt: null,
 
     // ── Project
     setProjectId: (id) => set((s) => { s.projectId = id }),
@@ -347,6 +361,75 @@ export const useDAWStore = create<DAWState & DAWActions>()(
     toggleAIPanel: () => set((s) => { s.aiPanelOpen = !s.aiPanelOpen }),
     setAIPanelOpen: (open) => set((s) => { s.aiPanelOpen = open }),
 
+    // ── Persistence
+    saveProject: async () => {
+      const state = get()
+      if (!state.projectId || state.projectId === 'new') return
+
+      set((s) => { s.saveStatus = 'saving' })
+      try {
+        const project: Project = {
+          id: state.projectId,
+          name: state.projectName,
+          bpm: state.bpm,
+          timeSignature: state.timeSignature,
+          sampleRate: 44100,
+          tracks: state.tracks.map((t) => ({
+            ...t,
+            clips: t.clips.map((c) => ({
+              ...c,
+              audioBuffer: undefined,
+            })),
+          })),
+          createdAt: '',
+          updatedAt: '',
+        }
+        await projectsApi.save(state.projectId, project)
+        set((s) => {
+          s.saveStatus = 'saved'
+          s.lastSavedAt = new Date().toISOString()
+        })
+      } catch {
+        set((s) => { s.saveStatus = 'error' })
+      }
+    },
+
+    loadProject: async (id) => {
+      try {
+        const project = await projectsApi.get(id)
+        set((s) => {
+          s.projectId = project.id
+          s.projectName = project.name
+          s.bpm = project.bpm
+          s.timeSignature = project.timeSignature ?? [4, 4]
+          s.tracks = project.tracks ?? []
+          s.selectedTrackId = null
+          s.selectedClipId = null
+          s.saveStatus = 'saved'
+          s.lastSavedAt = project.updatedAt
+        })
+      } catch {
+        // Project not found or API error — start fresh
+        set((s) => { s.saveStatus = 'idle' })
+      }
+    },
+
+    createProject: async (name, bpm = 120) => {
+      const project = await projectsApi.create({ name, bpm })
+      set((s) => {
+        s.projectId = project.id
+        s.projectName = project.name
+        s.bpm = project.bpm
+        s.timeSignature = [4, 4]
+        s.tracks = []
+        s.selectedTrackId = null
+        s.selectedClipId = null
+        s.saveStatus = 'saved'
+        s.lastSavedAt = project.createdAt
+      })
+      return project.id
+    },
+
     // ── Hydrate
     hydrate: (state) => set((s) => { Object.assign(s, state) }),
   }))
@@ -366,3 +449,24 @@ export const selectClipById = (id: string) =>
 
 export const selectSoloTracks = (s: DAWState) =>
   s.tracks.filter((t) => t.solo)
+
+// ─── Auto-save (debounced 2s after changes) ─────────────────────────────────
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+let lastTracksJson = ''
+
+useDAWStore.subscribe((state) => {
+  const { projectId, transport } = state
+  // Don't auto-save if no project, during recording, or while playing
+  if (!projectId || projectId === 'new' || transport.isRecording || transport.isPlaying) return
+
+  // Only trigger save when tracks/name/bpm actually changed
+  const tracksJson = JSON.stringify({ t: state.tracks, n: state.projectName, b: state.bpm })
+  if (tracksJson === lastTracksJson) return
+  lastTracksJson = tracksJson
+
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    useDAWStore.getState().saveProject()
+  }, 2000)
+})

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { clsx } from 'clsx'
 import { useDAWStore } from '@/store/dawStore'
 import { useAudioEngine } from '@/hooks/useAudioEngine'
@@ -16,7 +16,7 @@ import { LEDIndicator } from '@/components/common/LEDIndicator'
 // ─── Status Bar ──────────────────────────────────────────────────────────────
 
 function StatusBar() {
-  const { projectName, tracks } = useDAWStore()
+  const { projectName, tracks, saveStatus } = useDAWStore()
   const [cpuLoad] = useState(() => (Math.random() * 8 + 2).toFixed(1))
 
   return (
@@ -36,6 +36,19 @@ function StatusBar() {
         <span className="text-[9px] font-lcd text-text-muted/40">|</span>
         <span className="text-[9px] font-lcd text-text-muted">
           <span className="text-accent/60">{tracks.length}</span> tracks
+        </span>
+        <span className="text-[9px] font-lcd text-text-muted/40">|</span>
+        <span className={clsx(
+          'text-[9px] font-lcd',
+          saveStatus === 'saving' && 'text-amber',
+          saveStatus === 'saved' && 'text-neon-green/60',
+          saveStatus === 'error' && 'text-neon-red/60',
+          saveStatus === 'idle' && 'text-text-muted/40',
+        )}>
+          {saveStatus === 'saving' ? 'Saving...'
+            : saveStatus === 'saved' ? 'Saved'
+            : saveStatus === 'error' ? 'Save error'
+            : ''}
         </span>
       </div>
 
@@ -121,7 +134,8 @@ function ResizeGrip({ onResize }: { onResize: (delta: number) => void }) {
 
 export function ProjectPage() {
   const { id } = useParams<{ id: string }>()
-  const { setProjectId, setProjectName, addTrack, tracks, aiPanelOpen } = useDAWStore()
+  const navigate = useNavigate()
+  const { setProjectId, setProjectName, addTrack, tracks, aiPanelOpen, loadProject, createProject } = useDAWStore()
   const [mixerHeight, setMixerHeight] = useState(280)
 
   useAudioEngine()
@@ -131,15 +145,25 @@ export function ProjectPage() {
   // Initialize a new project or load an existing one
   useEffect(() => {
     if (id === 'new' || !id) {
-      setProjectId('new')
-      setProjectName('Untitled Project')
-      // Add a default MIDI track if none exist
-      if (tracks.length === 0) {
-        addTrack('midi', 'MIDI Track 1')
-      }
+      // Create a new project in the database
+      createProject('Untitled Project', 120).then((newId) => {
+        navigate(`/project/${newId}`, { replace: true })
+      }).catch(() => {
+        // Fallback: work in memory if API is unavailable
+        setProjectId('new')
+        setProjectName('Untitled Project')
+        if (tracks.length === 0) {
+          addTrack('midi', 'MIDI Track 1')
+        }
+      })
     } else {
-      setProjectId(id)
-      // TODO: Load project from API
+      loadProject(id).then(() => {
+        // If project loaded with no tracks, add a default
+        const state = useDAWStore.getState()
+        if (state.tracks.length === 0) {
+          addTrack('midi', 'MIDI Track 1')
+        }
+      })
     }
   }, [id])
 

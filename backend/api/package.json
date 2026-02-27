@@ -12,11 +12,13 @@
     "@anthropic-ai/sdk": "^0.39.0",
     "fastify": "^4.26.2",
     "@fastify/cors": "^9.0.1",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "pg": "^8.13.1"
   },
   "devDependencies": {
     "typescript": "^5.4.2",
     "tsx": "^4.7.1",
-    "@types/node": "^20.11.0"
+    "@types/node": "^20.11.0",
+    "@types/pg": "^8.11.10"
   }
 }

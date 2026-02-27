@@ -1,13 +1,18 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Music, Sparkles, Keyboard, Waves, Cpu } from 'lucide-react'
+import { Plus, Music, Sparkles, Keyboard, Waves, Cpu, Trash2 } from 'lucide-react'
 import { Button } from '@/components/common/Button'
 import { LEDIndicator } from '@/components/common/LEDIndicator'
+import { projectsApi } from '@/services/apiClient'
 
-const DEMO_PROJECTS = [
-  { id: 'demo-1', name: 'Midnight Keys', bpm: 95, tracks: 3, updatedAt: '2 hours ago' },
-  { id: 'demo-2', name: 'Neon Pulse', bpm: 128, tracks: 5, updatedAt: 'Yesterday' },
-  { id: 'demo-3', name: 'Cloud Nine', bpm: 80, tracks: 2, updatedAt: '3 days ago' },
-]
+interface ProjectSummary {
+  id: string
+  name: string
+  bpm: number
+  timeSignature: [number, number]
+  createdAt: string
+  updatedAt: string
+}
 
 // Animated gradient mesh background
 function GradientMesh() {
@@ -96,8 +101,34 @@ function ShimmerLogo() {
   )
 }
 
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'Just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
 export function HomePage() {
   const navigate = useNavigate()
+  const [projects, setProjects] = useState<ProjectSummary[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    projectsApi.list()
+      .then((data) => setProjects(data as ProjectSummary[]))
+      .catch(() => setProjects([]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    await projectsApi.delete(id)
+    setProjects((prev) => prev.filter((p) => p.id !== id))
+  }
 
   return (
     <div className="h-full flex flex-col overflow-auto relative">
@@ -208,7 +239,11 @@ export function HomePage() {
               </h3>
             </div>
             <div className="grid gap-2">
-              {DEMO_PROJECTS.map((project, i) => (
+              {loading ? (
+                <div className="text-center py-6 text-text-muted text-xs">Loading projects...</div>
+              ) : projects.length === 0 ? (
+                <div className="text-center py-6 text-text-muted text-xs">No projects yet. Create one to get started.</div>
+              ) : projects.map((project, i) => (
                 <button
                   key={project.id}
                   onClick={() => navigate(`/project/${project.id}`)}
@@ -243,13 +278,19 @@ export function HomePage() {
                     <div className="text-sm font-medium text-text-primary truncate">{project.name}</div>
                     <div className="text-[9px] text-text-muted font-lcd flex items-center gap-2">
                       <span className="text-accent">{project.bpm}</span> BPM
-                      <span className="text-border-default">|</span>
-                      <span className="text-accent">{project.tracks}</span> tracks
                     </div>
                   </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-[9px] text-text-muted font-lcd">{project.updatedAt}</span>
-                    <LEDIndicator on color="green" size="xs" />
+                  <div className="flex items-center gap-3">
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="text-[9px] text-text-muted font-lcd">{timeAgo(project.updatedAt)}</span>
+                      <LEDIndicator on color="green" size="xs" />
+                    </div>
+                    <button
+                      onClick={(e) => handleDelete(e, project.id)}
+                      className="p-1.5 rounded text-text-muted/30 hover:text-neon-red/80 hover:bg-neon-red/5 transition-all opacity-0 group-hover:opacity-100"
+                    >
+                      <Trash2 size={12} />
+                    </button>
                   </div>
                 </button>
               ))}

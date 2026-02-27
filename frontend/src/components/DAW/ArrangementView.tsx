@@ -242,25 +242,67 @@ function drawClip(
   }
 
   // MIDI note preview
-  if (clip.notes?.length && w > 30) {
+  if (clip.notes?.length && w > 20) {
     const pitches = clip.notes.map((n) => n.pitch)
     const minP = Math.min(...pitches)
     const maxP = Math.max(...pitches)
-    const range = Math.max(maxP - minP, 12)
+    const range = Math.max(maxP - minP, 8)
+    const noteAreaTop = y + CLIP_HEADER_H + 2
     const noteArea = h - CLIP_HEADER_H - 4
+
+    // Parse track color for note rendering
+    const [cr, cg, cb] = hexToRgb(color)
 
     clip.notes.forEach((note) => {
       const nx = x + (note.startBeat / clip.durationBeats) * w
-      const nh = Math.max(1.5, noteArea * 0.15)
-      const ny = y + CLIP_HEADER_H + 2 + noteArea - ((note.pitch - minP) / range) * noteArea
-      const nw = Math.max(2, (note.durationBeats / clip.durationBeats) * w)
+      const nh = Math.max(2.5, (noteArea / range) * 0.85)
+      const ny = noteAreaTop + noteArea - ((note.pitch - minP + 0.5) / range) * noteArea - nh / 2
+      const nw = Math.max(3, (note.durationBeats / clip.durationBeats) * w - 1)
 
-      // Velocity-based color
       const vel = note.velocity / 127
-      const hue = 200 + vel * 40 // blue to cyan
-      ctx.fillStyle = `hsla(${hue}, 80%, ${50 + vel * 20}%, ${0.5 + vel * 0.4})`
-      ctx.fillRect(nx, ny, nw - 0.5, nh)
+      const brightness = 1.2 + vel * 0.6
+
+      // Glow behind note
+      ctx.fillStyle = `rgba(${Math.min(255, cr * brightness)}, ${Math.min(255, cg * brightness)}, ${Math.min(255, cb * brightness)}, 0.15)`
+      ctx.fillRect(nx - 1, ny - 1, nw + 2, nh + 2)
+
+      // Note bar — bright, using track color with velocity-based intensity
+      ctx.fillStyle = `rgba(${Math.min(255, cr * brightness)}, ${Math.min(255, cg * brightness)}, ${Math.min(255, cb * brightness)}, ${0.6 + vel * 0.4})`
+      ctx.beginPath()
+      ctx.roundRect(nx, ny, nw, nh, 1)
+      ctx.fill()
+
+      // Top highlight
+      ctx.fillStyle = `rgba(255, 255, 255, ${0.15 + vel * 0.15})`
+      ctx.fillRect(nx, ny, nw, 0.5)
     })
+
+    // Note count badge in header
+    if (w > 40) {
+      const countText = `${clip.notes.length}n`
+      ctx.font = '8px "JetBrains Mono", monospace'
+      const tw = ctx.measureText(countText).width
+      const bx = x + w - tw - 6
+      const by = y + 3
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.12)'
+      ctx.beginPath()
+      ctx.roundRect(bx - 2, by - 1, tw + 4, 10, 3)
+      ctx.fill()
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'
+      ctx.fillText(countText, bx, by + 7)
+    }
+  } else if (!clip.notes?.length && w > 20) {
+    // Empty clip — draw subtle indicator
+    ctx.setLineDash([3, 3])
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)'
+    ctx.lineWidth = 1
+    const midY = y + CLIP_HEADER_H + (h - CLIP_HEADER_H) / 2
+    ctx.beginPath()
+    ctx.moveTo(x + 6, midY)
+    ctx.lineTo(x + w - 6, midY)
+    ctx.stroke()
+    ctx.setLineDash([])
   }
 
   // Fade handle triangles

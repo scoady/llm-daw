@@ -1,11 +1,12 @@
 /**
- * LLM-DAW API — Minimal Fastify server that proxies MIDI analysis requests to Claude.
+ * LLM-DAW API — Fastify server with project persistence and AI analysis.
  */
 
 import 'dotenv/config'
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import Anthropic from '@anthropic-ai/sdk'
+import { initDB, pool, loadProjectTree, saveProjectTree } from './db.js'
 
 const PORT = parseInt(process.env.PORT ?? '4000')
 const CORS_ORIGIN = process.env.CORS_ORIGIN ?? 'http://localhost:5173'
@@ -135,12 +136,108 @@ const app = Fastify({ logger: true })
 
 await app.register(cors, {
   origin: CORS_ORIGIN,
-  methods: ['GET', 'POST', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 })
 
 // ── Health check ─────────────────────────────────────────────────────────────
 
 app.get('/api/health', async () => ({ status: 'ok', service: 'llm-daw-api' }))
+
+// ── Project CRUD ─────────────────────────────────────────────────────────────
+
+// List all projects (metadata only, no nested children)
+app.get('/api/projects', async () => {
+  const res = await pool.query(
+    'SELECT id, name, bpm, time_sig_n, time_sig_d, created_at, updated_at FROM projects ORDER BY updated_at DESC'
+  )
+  return res.rows.map((r: Record<string, unknown>) => ({
+    id: r.id,
+    name: r.name,
+    bpm: r.bpm,
+    timeSignature: [r.time_sig_n, r.time_sig_d],
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  }))
+})
+
+// Get single project (full tree)
+app.get<{ Params: { id: string } }>('/api/projects/:id', async (request, reply) => {
+  const project = await loadProjectTree(request.params.id)
+  if (!project) return reply.status(404).send({ error: 'Project not found' })
+  return project
+})
+
+// Create project
+app.post<{ Body: { name: string; bpm?: number } }>('/api/projects', async (request) => {
+  const { name, bpm = 120 } = request.body
+  const id = crypto.randomUUID()
+  await pool.query(
+    'INSERT INTO projects (id, name, bpm) VALUES ($1, $2, $3)',
+    [id, name, bpm]
+  )
+  return {
+    id,
+    name,
+    bpm,
+    timeSignature: [4, 4],
+    sampleRate: 44100,
+    tracks: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+})
+
+// Full save (upsert project + all children)
+app.put<{ Params: { id: string }; Body: Record<string, unknown> }>('/api/projects/:id', async (request, reply) => {
+  const body = request.body as {
+    id?: string
+    name: string
+    bpm: number
+    timeSignature: [number, number]
+    sampleRate: number
+    tracks: Array<{
+      id: string
+      name: string
+      type: string
+      color: string
+      volume: number
+      pan: number
+      muted: boolean
+      solo: boolean
+      armed: boolean
+      clips: Array<{
+        id: string
+        trackId: string
+        name: string
+        startBeat: number
+        durationBeats: number
+        color?: string
+        notes?: Array<{
+          id: string
+          pitch: number
+          startBeat: number
+          durationBeats: number
+          velocity: number
+        }>
+      }>
+    }>
+  }
+
+  try {
+    await saveProjectTree({ ...body, id: request.params.id })
+    return { ok: true }
+  } catch (err) {
+    request.log.error({ err }, 'Failed to save project')
+    return reply.status(500).send({ error: 'Failed to save project' })
+  }
+})
+
+// Delete project (cascades to tracks → clips → notes)
+app.delete<{ Params: { id: string } }>('/api/projects/:id', async (request, reply) => {
+  const res = await pool.query('DELETE FROM projects WHERE id = $1', [request.params.id])
+  if (res.rowCount === 0) return reply.status(404).send({ error: 'Project not found' })
+  return { ok: true }
+})
 
 // ── Analyze endpoint ─────────────────────────────────────────────────────────
 
@@ -238,6 +335,8 @@ app.post<{ Body: GenerateRequest }>('/api/ai/generate', async (request, reply) =
 // ── Start ────────────────────────────────────────────────────────────────────
 
 try {
+  await initDB()
+  console.log('Database initialized')
   await app.listen({ port: PORT, host: '0.0.0.0' })
   console.log(`LLM-DAW API running on http://localhost:${PORT}`)
 } catch (err) {
