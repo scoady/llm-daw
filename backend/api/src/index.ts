@@ -160,7 +160,7 @@ await app.register(cors, {
 })
 
 await app.register(multipart, {
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+  limits: { fileSize: 1024 * 1024 * 1024 }, // 1GB
 })
 
 // ── Health check ─────────────────────────────────────────────────────────────
