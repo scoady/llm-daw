@@ -280,7 +280,7 @@ function SuggestionCard({ suggestion, index }: { suggestion: Suggestion; index: 
 
   const handleAddToTrack = useCallback(() => {
     // Always create a new track at beat 0
-    const track = addTrack('midi', suggestion.label ?? 'AI Suggestion')
+    const track = addTrack('midi', suggestion.name ?? 'AI Suggestion')
     const clip = addClip(track.id, 0, suggestion.durationBeats)
 
     for (const note of suggestion.notes) {
