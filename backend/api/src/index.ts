@@ -152,7 +152,10 @@ Rules:
 
 // ─── Server setup ────────────────────────────────────────────────────────────
 
-const app = Fastify({ logger: true })
+const app = Fastify({
+  logger: true,
+  bodyLimit: 1024 * 1024 * 1024, // 1GB — matches multipart limit
+})
 
 await app.register(cors, {
   origin: CORS_ORIGIN,

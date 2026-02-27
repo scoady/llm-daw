@@ -11,6 +11,8 @@ metadata:
     # Longer timeout for AI analysis requests (Claude can take several seconds)
     nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+    # Allow large audio file uploads (up to 1GB)
+    nginx.ingress.kubernetes.io/proxy-body-size: "1g"
 spec:
   ingressClassName: {{ .Values.frontend.ingress.className }}
   rules:
