@@ -69,10 +69,11 @@ export function useMIDIInput() {
       // Visual feedback
       useDAWStore.getState().addActiveMidiNote(event.pitch)
 
-      // Recording: buffer the note start
+      // Recording: buffer the note start (read beat directly from audio engine for precision)
       if (state.transport.isRecording && state.recordingClipId && state.recordingStartBeat !== null) {
+        const liveBeat = audioEngine.getCurrentBeat()
         pendingNotes.current.set(event.pitch, {
-          startBeat: state.transport.currentBeat - state.recordingStartBeat,
+          startBeat: liveBeat - state.recordingStartBeat,
           velocity: event.velocity,
         })
       }
@@ -92,11 +93,12 @@ export function useMIDIInput() {
       // Visual feedback
       useDAWStore.getState().removeActiveMidiNote(event.pitch)
 
-      // Recording: finalize the note
+      // Recording: finalize the note (read beat directly from audio engine)
       if (state.transport.isRecording && state.recordingClipId) {
         const pending = pendingNotes.current.get(event.pitch)
         if (pending) {
-          const currentBeat = state.transport.currentBeat - (state.recordingStartBeat ?? 0)
+          const liveBeat = audioEngine.getCurrentBeat()
+          const currentBeat = liveBeat - (state.recordingStartBeat ?? 0)
           const duration = Math.max(0.125, currentBeat - pending.startBeat)
 
           useDAWStore.getState().addNote(state.recordingClipId, {

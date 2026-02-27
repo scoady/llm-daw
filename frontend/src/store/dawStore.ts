@@ -112,6 +112,7 @@ interface DAWActions {
   // Recording
   startRecording(): void
   stopRecording(): void
+  updateRecordingDuration(currentBeat: number): void
 
   // AI Panel
   toggleAIPanel(): void
@@ -332,7 +333,7 @@ export const useDAWStore = create<DAWState & DAWActions>()(
       if (!armedTrack) return
 
       const startBeat = state.transport.currentBeat
-      const clip = state.addClip(armedTrack.id, startBeat, 0)
+      const clip = state.addClip(armedTrack.id, startBeat, 4)
 
       set((s) => {
         s.transport.isRecording = true
@@ -342,12 +343,12 @@ export const useDAWStore = create<DAWState & DAWActions>()(
     },
     stopRecording: () => set((s) => {
       if (s.recordingClipId && s.recordingStartBeat !== null) {
-        // Finalize clip duration based on current beat
+        // Finalize clip duration snapped to bar
         const duration = Math.max(1, s.transport.currentBeat - s.recordingStartBeat)
         for (const t of s.tracks) {
           const clip = t.clips.find((c) => c.id === s.recordingClipId)
           if (clip) {
-            clip.durationBeats = Math.ceil(duration / 4) * 4 // snap to bar
+            clip.durationBeats = Math.ceil(duration / 4) * 4
             break
           }
         }
@@ -355,6 +356,19 @@ export const useDAWStore = create<DAWState & DAWActions>()(
       s.transport.isRecording = false
       s.recordingStartBeat = null
       s.recordingClipId = null
+    }),
+    updateRecordingDuration: (currentBeat) => set((s) => {
+      if (!s.recordingClipId || s.recordingStartBeat === null) return
+      const elapsed = currentBeat - s.recordingStartBeat
+      // Grow clip in 4-beat increments as recording progresses
+      const needed = Math.ceil(Math.max(4, elapsed + 1) / 4) * 4
+      for (const t of s.tracks) {
+        const clip = t.clips.find((c) => c.id === s.recordingClipId)
+        if (clip && clip.durationBeats < needed) {
+          clip.durationBeats = needed
+          break
+        }
+      }
     }),
 
     // ── AI Panel

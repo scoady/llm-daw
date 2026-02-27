@@ -253,11 +253,16 @@ function drawClip(
     // Parse track color for note rendering
     const [cr, cg, cb] = hexToRgb(color)
 
+    // Guard: use actual note span as fallback if durationBeats is 0
+    const clipDur = clip.durationBeats > 0
+      ? clip.durationBeats
+      : Math.max(4, ...clip.notes.map((n) => n.startBeat + n.durationBeats))
+
     clip.notes.forEach((note) => {
-      const nx = x + (note.startBeat / clip.durationBeats) * w
+      const nx = x + (note.startBeat / clipDur) * w
       const nh = Math.max(2.5, (noteArea / range) * 0.85)
       const ny = noteAreaTop + noteArea - ((note.pitch - minP + 0.5) / range) * noteArea - nh / 2
-      const nw = Math.max(3, (note.durationBeats / clip.durationBeats) * w - 1)
+      const nw = Math.max(3, (note.durationBeats / clipDur) * w - 1)
 
       const vel = note.velocity / 127
       const brightness = 1.2 + vel * 0.6

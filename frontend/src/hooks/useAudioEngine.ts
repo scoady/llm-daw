@@ -13,6 +13,7 @@ export function useAudioEngine() {
     transport,
     setCurrentBeat,
     setPlaying,
+    updateRecordingDuration,
   } = useDAWStore()
 
   const rafRef = useRef<number>(0)
@@ -29,17 +30,22 @@ export function useAudioEngine() {
     }
   }, [transport.isPlaying])
 
-  // Playhead animation loop
+  // Playhead animation loop + recording clip growth
   useEffect(() => {
     const tick = () => {
       if (audioEngine.isPlaying()) {
-        setCurrentBeat(audioEngine.getCurrentBeat())
+        const beat = audioEngine.getCurrentBeat()
+        setCurrentBeat(beat)
+        // Grow the recording clip as the playhead advances
+        if (useDAWStore.getState().transport.isRecording) {
+          updateRecordingDuration(beat)
+        }
       }
       rafRef.current = requestAnimationFrame(tick)
     }
     rafRef.current = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [setCurrentBeat])
+  }, [setCurrentBeat, updateRecordingDuration])
 
   const play = useCallback(async () => {
     audioEngine.scheduleTracks(tracks)

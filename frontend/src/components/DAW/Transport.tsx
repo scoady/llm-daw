@@ -95,11 +95,13 @@ export function Transport() {
   const toggleRecord = useCallback(() => {
     if (transport.isRecording) {
       stopRecording()
+      // Stop transport and seek to start so user can immediately replay
+      stop()
     } else {
       startRecording()
       if (!transport.isPlaying) play()
     }
-  }, [transport.isRecording, transport.isPlaying, startRecording, stopRecording, play])
+  }, [transport.isRecording, transport.isPlaying, startRecording, stopRecording, play, stop])
 
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 select-none transport-bar scan-line-overlay">
