@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Sparkles, Keyboard, Waves, Cpu, Trash2 } from 'lucide-react'
+import { Plus, Music, Sparkles, Keyboard, Waves, Cpu, Trash2 } from 'lucide-react'
 import { Button } from '@/components/common/Button'
 import { LEDIndicator } from '@/components/common/LEDIndicator'
 import { LogoIcon } from '@/components/common/LogoIcon'
