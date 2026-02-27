@@ -31,7 +31,7 @@ export default defineConfig({
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
           tone: ['tone', '@tonejs/midi'],
-          ui: ['@headlessui/react', 'lucide-react', 'framer-motion'],
+          ui: ['@headlessui/react', 'lucide-react'],
           state: ['zustand', 'immer', '@tanstack/react-query'],
         },
       },
