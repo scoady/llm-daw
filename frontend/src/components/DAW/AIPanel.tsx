@@ -218,8 +218,8 @@ function MiniNotePreview({ notes, height = 48 }: { notes: Note[]; height?: numbe
 // ─── Suggestion Card ────────────────────────────────────────────────────────
 
 function SuggestionCard({ suggestion, index }: { suggestion: Suggestion; index: number }) {
-  const { bpm, tracks, selectedTrackId, addTrack, addClip, addNote } = useDAWStore()
-  const { previewingSuggestionId, setPreviewingSuggestionId } = useAIStore()
+  const { bpm, tracks, selectedTrackId, addTrack, addClip, addNote, setTrackInstrument } = useDAWStore()
+  const { previewingSuggestionId, setPreviewingSuggestionId, targetPresetId: aiTargetPresetId } = useAIStore()
   const isPreviewing = previewingSuggestionId === suggestion.id
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const previewSynthRef = useRef<any>(null)
@@ -286,6 +286,12 @@ function SuggestionCard({ suggestion, index }: { suggestion: Suggestion; index: 
   const handleAddToTrack = useCallback(() => {
     // Always create a new track at beat 0
     const track = addTrack('midi', suggestion.name ?? 'AI Suggestion')
+
+    // Auto-assign instrument preset if a smart prompt targeted one
+    if (aiTargetPresetId) {
+      setTrackInstrument(track.id, aiTargetPresetId)
+    }
+
     const clip = addClip(track.id, 0, suggestion.durationBeats)
 
     for (const note of suggestion.notes) {
@@ -296,7 +302,7 @@ function SuggestionCard({ suggestion, index }: { suggestion: Suggestion; index: 
         velocity: note.velocity,
       })
     }
-  }, [addTrack, addClip, addNote, suggestion])
+  }, [addTrack, addClip, addNote, setTrackInstrument, aiTargetPresetId, suggestion])
 
   return (
     <div
@@ -384,15 +390,27 @@ function SuggestionCard({ suggestion, index }: { suggestion: Suggestion; index: 
   )
 }
 
-// ─── Prompt Suggestions ──────────────────────────────────────────────────────
+// ─── Smart Instrument-Aware Prompts ──────────────────────────────────────────
 
-const QUICK_PROMPTS = [
-  'Identify the key and suggest harmonies',
-  'Continue this melody for 8 more bars',
-  'Add a bass line that complements this',
-  'Create a chord progression to go with this melody',
-  'Suggest a variation with a different feel',
-  'Harmonize this in thirds and sixths',
+interface SmartPrompt {
+  label: string
+  prompt: string
+  targetPresetId?: string
+  icon: string
+  instrumentHint?: string  // sent to backend for pitch range guidance
+}
+
+const SMART_PROMPTS: SmartPrompt[] = [
+  { icon: '🥁', label: 'Generate a drum beat',     prompt: 'Generate a drum beat pattern that complements this melody', targetPresetId: 'kick', instrumentHint: 'drums' },
+  { icon: '🎸', label: 'Add a bass line',          prompt: 'Add a bass line that complements this', targetPresetId: 'synth-bass', instrumentHint: 'bass' },
+  { icon: '🎹', label: 'Harmonize with piano',     prompt: 'Create a piano chord accompaniment for this melody', targetPresetId: 'classic-piano', instrumentHint: 'piano' },
+  { icon: '☁️', label: 'Add a pad progression',    prompt: 'Create a lush pad chord progression behind this melody', targetPresetId: 'warm-pad', instrumentHint: 'pad' },
+  { icon: '⚡', label: 'Create a lead melody',     prompt: 'Create a lead melody that complements this harmony', targetPresetId: 'saw-lead', instrumentHint: 'lead' },
+  { icon: '🔔', label: 'Add bell accents',         prompt: 'Add bell/chime accent notes that highlight key moments', targetPresetId: 'fm-bell', instrumentHint: 'bell' },
+  { icon: '🎵', label: 'Add plucked arpeggios',    prompt: 'Create a plucked arpeggio pattern from these chords', targetPresetId: 'guitar', instrumentHint: 'plucked' },
+  { icon: '→',  label: 'Continue this melody',     prompt: 'Continue this melody for 8 more bars' },
+  { icon: '🎼', label: 'Create chord progression', prompt: 'Create a chord progression to go with this melody', targetPresetId: 'electric-piano', instrumentHint: 'piano' },
+  { icon: '🔀', label: 'Suggest a variation',      prompt: 'Suggest a variation with a different feel' },
 ]
 
 // ─── Neural Network Loading Animation ────────────────────────────────────────
@@ -525,7 +543,12 @@ export function AIPanel() {
     suggestions,
     setSuggestions,
     clearResults,
+    targetPresetId: aiTargetPresetId,
+    setTargetPresetId,
   } = useAIStore()
+
+  // Track the instrument hint for the current prompt
+  const instrumentHintRef = useRef<string | undefined>(undefined)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -560,7 +583,8 @@ export function AIPanel() {
           velocity: n.velocity,
         })),
         bpm,
-        prompt || 'Analyze these notes and suggest harmonies, continuations, and variations.'
+        prompt || 'Analyze these notes and suggest harmonies, continuations, and variations.',
+        instrumentHintRef.current,
       )
       setAnalysis(result.analysis)
       setSuggestions(result.suggestions)
@@ -689,13 +713,15 @@ export function AIPanel() {
             </button>
           </div>
 
-          {/* Quick prompts */}
+          {/* Smart prompts */}
           <div className="flex flex-wrap gap-1.5">
-            {QUICK_PROMPTS.map((qp, i) => (
+            {SMART_PROMPTS.map((sp, i) => (
               <button
-                key={qp}
+                key={sp.label}
                 onClick={() => {
-                  setPrompt(qp)
+                  setPrompt(sp.prompt)
+                  setTargetPresetId(sp.targetPresetId ?? null)
+                  instrumentHintRef.current = sp.instrumentHint
                   textareaRef.current?.focus()
                 }}
                 className="text-[9px] px-2 py-1 rounded text-text-muted transition-all
@@ -716,7 +742,8 @@ export function AIPanel() {
                   e.currentTarget.style.boxShadow = 'none'
                 }}
               >
-                {qp}
+                <span className="mr-1">{sp.icon}</span>
+                {sp.label}
               </button>
             ))}
           </div>

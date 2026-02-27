@@ -88,8 +88,8 @@ interface AIGenerateResponse {
 }
 
 export const aiClient = {
-  analyze: (notes: Note[], bpm: number, prompt: string) =>
-    api.post<AIAnalyzeResponse>('/api/ai/analyze', { notes, bpm, prompt }).then((r) => r.data),
+  analyze: (notes: Note[], bpm: number, prompt: string, targetInstrument?: string) =>
+    api.post<AIAnalyzeResponse>('/api/ai/analyze', { notes, bpm, prompt, targetInstrument }).then((r) => r.data),
 
   generate: (seedNotes: Note[], bpm: number, type: string, bars: number, options?: { key?: string; scale?: string; style?: string }) =>
     api.post<AIGenerateResponse>('/api/ai/generate', { seedNotes, bpm, type, bars, ...options }).then((r) => r.data),

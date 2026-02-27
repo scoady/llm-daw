@@ -1,9 +1,9 @@
-import { useCallback } from 'react'
+import { useCallback, useState, useRef, useEffect } from 'react'
 import {
   Play, Pause, Square, Circle,
   SkipBack, Repeat,
   ZoomIn, ZoomOut, Sparkles,
-  ChevronUp, ChevronDown,
+  ChevronUp, ChevronDown, Grid3x3,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useDAWStore } from '@/store/dawStore'
@@ -83,9 +83,41 @@ function AudioStatus() {
 }
 
 export function Transport() {
-  const { transport, zoomIn, zoomOut, startRecording, stopRecording, toggleAIPanel, aiPanelOpen } = useDAWStore()
+  const {
+    transport, tracks, selectedTrackId, quantizeGrid,
+    zoomIn, zoomOut, startRecording, stopRecording,
+    toggleAIPanel, aiPanelOpen, quantizeClip, setQuantizeGrid,
+  } = useDAWStore()
   const { play, pause, stop } = useAudioEngine()
   const masterLevel = useSimulatedLevel(transport.isPlaying ? 0.5 : 0.08, transport.isPlaying ? 0.2 : 0.04)
+
+  const [quantizeOpen, setQuantizeOpen] = useState(false)
+  const quantizeRef = useRef<HTMLDivElement>(null)
+
+  // Close quantize dropdown on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (quantizeRef.current && !quantizeRef.current.contains(e.target as Node)) {
+        setQuantizeOpen(false)
+      }
+    }
+    if (quantizeOpen) document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [quantizeOpen])
+
+  const gridLabel = quantizeGrid === 1 ? '1/4' : quantizeGrid === 0.5 ? '1/8' : '1/16'
+
+  const handleQuantize = useCallback(() => {
+    // Quantize all clips on the selected or armed track
+    const target = tracks.find((t) => t.id === selectedTrackId)
+      ?? tracks.find((t) => t.armed)
+    if (!target) return
+    for (const clip of target.clips) {
+      if (clip.notes?.length) {
+        quantizeClip(clip.id, quantizeGrid)
+      }
+    }
+  }, [tracks, selectedTrackId, quantizeGrid, quantizeClip])
 
   const togglePlay = useCallback(() => {
     if (transport.isPlaying) pause()
@@ -161,6 +193,54 @@ export function Transport() {
 
       {/* MIDI Status */}
       <MIDIStatus />
+
+      <div className="hardware-groove" />
+
+      {/* Quantize */}
+      <div ref={quantizeRef} className="relative flex items-center gap-1">
+        <button
+          onClick={handleQuantize}
+          title={`Quantize selected track (${gridLabel})`}
+          className="transport-btn"
+        >
+          <Grid3x3 size={12} />
+        </button>
+        <button
+          onClick={() => setQuantizeOpen(!quantizeOpen)}
+          className={clsx(
+            'px-1.5 py-1 rounded text-2xs font-lcd text-text-muted',
+            'border border-border-subtle hover:border-border-default transition-colors',
+            quantizeOpen && 'border-accent/50 text-accent'
+          )}
+        >
+          {gridLabel}
+        </button>
+        {quantizeOpen && (
+          <div
+            className="absolute top-full left-0 mt-1 rounded-lg shadow-panel-raised z-50 overflow-hidden py-1"
+            style={{ background: 'linear-gradient(180deg, #111420 0%, #0f1114 100%)', border: '1px solid #2d3348' }}
+          >
+            {([
+              { label: '1/4', value: 1 },
+              { label: '1/8', value: 0.5 },
+              { label: '1/16', value: 0.25 },
+            ] as const).map((opt) => (
+              <button
+                key={opt.label}
+                onClick={() => { setQuantizeGrid(opt.value); setQuantizeOpen(false) }}
+                className={clsx(
+                  'w-full px-4 py-1.5 text-left text-xs font-lcd transition-colors',
+                  quantizeGrid === opt.value
+                    ? 'text-accent bg-accent/10'
+                    : 'text-text-secondary hover:bg-surface-3'
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="hardware-groove" />
 

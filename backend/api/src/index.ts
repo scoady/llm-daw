@@ -28,6 +28,7 @@ interface AnalyzeRequest {
   notes: NoteData[]
   bpm: number
   prompt: string
+  targetInstrument?: string
 }
 
 interface GenerateRequest {
@@ -242,13 +243,34 @@ app.delete<{ Params: { id: string } }>('/api/projects/:id', async (request, repl
 // ── Analyze endpoint ─────────────────────────────────────────────────────────
 
 app.post<{ Body: AnalyzeRequest }>('/api/ai/analyze', async (request, reply) => {
-  const { notes, bpm, prompt } = request.body
+  const { notes, bpm, prompt, targetInstrument } = request.body
 
   if (!notes?.length) {
     return reply.status(400).send({ error: 'No notes provided' })
   }
 
   const description = notesToDescription(notes, bpm)
+
+  // Build instrument context for the AI
+  let instrumentCtx = ''
+  if (targetInstrument) {
+    const lower = targetInstrument.toLowerCase()
+    if (lower.includes('drum') || lower.includes('kick') || lower.includes('snare') || lower.includes('hi-hat')) {
+      instrumentCtx = `\n\nTarget instrument: drums. Generate notes appropriate for drums using standard GM drum mapping: kick=36, snare=38, closed hi-hat=42, open hi-hat=46, crash=49, ride=51, low tom=45, mid tom=47, high tom=50. Keep patterns on these specific MIDI pitches.`
+    } else if (lower.includes('bass')) {
+      instrumentCtx = `\n\nTarget instrument: bass. Generate notes in the bass range (MIDI 28-55, i.e. E1 to G3). Use patterns appropriate for bass lines.`
+    } else if (lower.includes('pad')) {
+      instrumentCtx = `\n\nTarget instrument: pad/synth pad. Generate sustained chords with long durations (2-4 beats). Use the mid range (MIDI 48-72).`
+    } else if (lower.includes('lead')) {
+      instrumentCtx = `\n\nTarget instrument: lead synth. Generate melodic single-note lines in the mid-high range (MIDI 60-84).`
+    } else if (lower.includes('bell') || lower.includes('chime')) {
+      instrumentCtx = `\n\nTarget instrument: bells/chimes. Generate sparse, high-register accent notes (MIDI 72-96) with shorter durations.`
+    } else if (lower.includes('pluck') || lower.includes('guitar') || lower.includes('harp')) {
+      instrumentCtx = `\n\nTarget instrument: plucked strings. Generate arpeggiated patterns or fingerpicked figures in the mid range (MIDI 48-76).`
+    } else if (lower.includes('piano') || lower.includes('keys')) {
+      instrumentCtx = `\n\nTarget instrument: piano/keys. Generate chord voicings or melodic patterns across a wide range (MIDI 36-84).`
+    }
+  }
 
   try {
     const message = await anthropic.messages.create({
@@ -258,7 +280,7 @@ app.post<{ Body: AnalyzeRequest }>('/api/ai/analyze', async (request, reply) => 
       messages: [
         {
           role: 'user',
-          content: `Here are the MIDI notes I played:\n\n${description}\n\nMy request: ${prompt || 'Analyze these notes and suggest harmonies, continuations, and variations.'}`,
+          content: `Here are the MIDI notes I played:\n\n${description}\n\nMy request: ${prompt || 'Analyze these notes and suggest harmonies, continuations, and variations.'}${instrumentCtx}`,
         },
       ],
     })

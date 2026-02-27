@@ -53,6 +53,9 @@ interface DAWState {
   recordingStartBeat: number | null
   recordingClipId: string | null
 
+  // Quantize
+  quantizeGrid: number  // 1 = 1/4, 0.5 = 1/8, 0.25 = 1/16
+
   // AI Panel
   aiPanelOpen: boolean
 
@@ -86,6 +89,8 @@ interface DAWActions {
   addNote(clipId: string, note: Omit<Note, 'id'>): void
   removeNote(clipId: string, noteId: string): void
   updateNote(clipId: string, noteId: string, patch: Partial<Note>): void
+  quantizeClip(clipId: string, division: number): void
+  setQuantizeGrid(division: number): void
 
   // Transport
   setPlaying(playing: boolean): void
@@ -164,6 +169,9 @@ export const useDAWStore = create<DAWState & DAWActions>()(
     // Recording
     recordingStartBeat: null,
     recordingClipId: null,
+
+    // Quantize
+    quantizeGrid: 0.5,
 
     // AI Panel
     aiPanelOpen: false,
@@ -301,6 +309,21 @@ export const useDAWStore = create<DAWState & DAWActions>()(
         if (n) { Object.assign(n, patch); return }
       }
     }),
+
+    quantizeClip: (clipId, division) => set((s) => {
+      for (const t of s.tracks) {
+        const c = t.clips.find((c) => c.id === clipId)
+        if (c?.notes) {
+          for (const n of c.notes) {
+            n.startBeat = Math.round(n.startBeat / division) * division
+            n.durationBeats = Math.max(division, Math.round(n.durationBeats / division) * division)
+          }
+          return
+        }
+      }
+    }),
+
+    setQuantizeGrid: (division) => set((s) => { s.quantizeGrid = division }),
 
     // ── Transport
     setPlaying: (playing) => set((s) => { s.transport.isPlaying = playing }),
