@@ -52,11 +52,13 @@ pipeline {
                   --context=dir://\${WORKSPACE}/frontend \\
                   --destination=${REGISTRY}/llm-daw/frontend:${IMAGE_TAG} \\
                   --destination=${REGISTRY}/llm-daw/frontend:latest \\
+                  --build-arg=REGISTRY=${REGISTRY} \\
                   --insecure \\
                   --insecure-pull \\
                   --skip-tls-verify \\
                   --skip-tls-verify-pull \\
-                  --cache=false \\
+                  --cache=true \\
+                  --cache-repo=${REGISTRY}/llm-daw/cache/frontend \\
                   --verbosity=info
               """
             }
@@ -73,11 +75,13 @@ pipeline {
                   --context=dir://\${WORKSPACE}/backend/api \\
                   --destination=${REGISTRY}/llm-daw/api:${IMAGE_TAG} \\
                   --destination=${REGISTRY}/llm-daw/api:latest \\
+                  --build-arg=REGISTRY=${REGISTRY} \\
                   --insecure \\
                   --insecure-pull \\
                   --skip-tls-verify \\
                   --skip-tls-verify-pull \\
-                  --cache=false \\
+                  --cache=true \\
+                  --cache-repo=${REGISTRY}/llm-daw/cache/api \\
                   --verbosity=info
               """
             }
