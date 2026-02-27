@@ -252,7 +252,6 @@ export function Piano() {
     const wkCount = whites.length
     if (wkCount > 0) {
       // Approximate key x position as percentage
-      const keyIdx = whites.findIndex(k => k.midi === midi) ?? blacks.findIndex(k => k.midi === midi)
       const approxX = ((midi - baseNote) / NOTES_VIS) * 100
       const hue = noteHue(midi)
       setParticles(prev => [...prev.slice(-20), {
@@ -692,7 +691,7 @@ export function Piano() {
         {/* Note history */}
         <div className="flex items-center gap-[3px]">
           <span className="text-[8px] font-lcd tracking-[0.15em] text-text-muted/30 mr-1">HIST</span>
-          {history.slice(-8).map((h, i) => {
+          {history.slice(-8).map((h) => {
             const hue = noteHue(h.midi)
             const age = (Date.now() - h.time) / 5000
             return (
