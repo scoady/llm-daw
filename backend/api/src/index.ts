@@ -6,7 +6,8 @@ import 'dotenv/config'
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import Anthropic from '@anthropic-ai/sdk'
-import { initDB, pool, loadProjectTree, saveProjectTree } from './db.js'
+import multipart from '@fastify/multipart'
+import { initDB, pool, loadProjectTree, saveProjectTree, loadLibraryClips, loadLibraryClip, saveLibraryClip, deleteLibraryClip, saveAudioFile, loadAudioFile } from './db.js'
 
 const PORT = parseInt(process.env.PORT ?? '4000')
 const CORS_ORIGIN = process.env.CORS_ORIGIN ?? 'http://localhost:5173'
@@ -158,6 +159,10 @@ await app.register(cors, {
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 })
 
+await app.register(multipart, {
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+})
+
 // ── Health check ─────────────────────────────────────────────────────────────
 
 app.get('/api/health', async () => ({ status: 'ok', service: 'llm-daw-api' }))
@@ -256,6 +261,79 @@ app.delete<{ Params: { id: string } }>('/api/projects/:id', async (request, repl
   const res = await pool.query('DELETE FROM projects WHERE id = $1', [request.params.id])
   if (res.rowCount === 0) return reply.status(404).send({ error: 'Project not found' })
   return { ok: true }
+})
+
+// ── Library CRUD ─────────────────────────────────────────────────────────────
+
+// List library clips
+app.get<{ Querystring: { category?: string; search?: string } }>('/api/library/clips', async (request) => {
+  const { category, search } = request.query
+  return loadLibraryClips(category, search)
+})
+
+// Get library clip with notes
+app.get<{ Params: { id: string } }>('/api/library/clips/:id', async (request, reply) => {
+  const clip = await loadLibraryClip(request.params.id)
+  if (!clip) return reply.status(404).send({ error: 'Clip not found' })
+  return clip
+})
+
+// Save clip to library
+app.post<{ Body: {
+  id: string; name: string; category: string; clipType: string
+  durationBeats: number; bpm: number; color?: string
+  audioFileId?: string; tags?: string
+  notes?: Array<{ id: string; pitch: number; startBeat: number; durationBeats: number; velocity: number }>
+} }>('/api/library/clips', async (request, reply) => {
+  try {
+    await saveLibraryClip(request.body)
+    return { ok: true, id: request.body.id }
+  } catch (err) {
+    request.log.error({ err }, 'Failed to save library clip')
+    return reply.status(500).send({ error: 'Failed to save library clip' })
+  }
+})
+
+// Delete library clip
+app.delete<{ Params: { id: string } }>('/api/library/clips/:id', async (request, reply) => {
+  const deleted = await deleteLibraryClip(request.params.id)
+  if (!deleted) return reply.status(404).send({ error: 'Clip not found' })
+  return { ok: true }
+})
+
+// ── Audio upload + streaming ────────────────────────────────────────────────
+
+// Upload audio file
+app.post('/api/upload/audio', async (request, reply) => {
+  const data = await request.file()
+  if (!data) return reply.status(400).send({ error: 'No file provided' })
+
+  const buffer = await data.toBuffer()
+  const id = crypto.randomUUID()
+  const filename = data.filename
+  const mimeType = data.mimetype
+
+  await saveAudioFile({
+    id,
+    filename,
+    mimeType,
+    sizeBytes: buffer.length,
+    data: buffer,
+  })
+
+  return { id, filename, mimeType, sizeBytes: buffer.length }
+})
+
+// Stream audio file
+app.get<{ Params: { id: string } }>('/api/audio/:id', async (request, reply) => {
+  const file = await loadAudioFile(request.params.id)
+  if (!file) return reply.status(404).send({ error: 'Audio file not found' })
+
+  return reply
+    .header('Content-Type', file.mimeType)
+    .header('Content-Length', file.sizeBytes)
+    .header('Cache-Control', 'public, max-age=31536000')
+    .send(file.data)
 })
 
 // ── Analyze endpoint ─────────────────────────────────────────────────────────

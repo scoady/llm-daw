@@ -61,6 +61,43 @@ export async function initDB(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_tracks_project ON tracks(project_id);
     CREATE INDEX IF NOT EXISTS idx_clips_track ON clips(track_id);
     CREATE INDEX IF NOT EXISTS idx_notes_clip ON notes(clip_id);
+
+    -- ── Library tables ──────────────────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS audio_files (
+      id          TEXT PRIMARY KEY,
+      filename    TEXT NOT NULL,
+      mime_type   TEXT NOT NULL DEFAULT 'audio/wav',
+      size_bytes  INTEGER NOT NULL DEFAULT 0,
+      duration_secs REAL,
+      sample_rate INTEGER DEFAULT 44100,
+      data        BYTEA NOT NULL,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS library_clips (
+      id             TEXT PRIMARY KEY,
+      name           TEXT NOT NULL,
+      category       TEXT NOT NULL DEFAULT 'uncategorized',
+      clip_type      TEXT NOT NULL DEFAULT 'midi',
+      duration_beats REAL NOT NULL DEFAULT 4,
+      bpm            INTEGER NOT NULL DEFAULT 120,
+      color          TEXT,
+      audio_file_id  TEXT REFERENCES audio_files(id) ON DELETE SET NULL,
+      tags           TEXT,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS library_notes (
+      id             TEXT PRIMARY KEY,
+      clip_id        TEXT NOT NULL REFERENCES library_clips(id) ON DELETE CASCADE,
+      pitch          INTEGER NOT NULL,
+      start_beat     REAL NOT NULL,
+      duration_beats REAL NOT NULL,
+      velocity       INTEGER NOT NULL DEFAULT 100
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_library_notes_clip ON library_notes(clip_id);
+    CREATE INDEX IF NOT EXISTS idx_library_clips_category ON library_clips(category);
   `)
 }
 
@@ -139,6 +176,165 @@ export async function loadProjectTree(projectId: string) {
  * Save a full project tree (replace strategy).
  * Deletes existing children and re-inserts from the incoming state.
  */
+// ─── Library CRUD ───────────────────────────────────────────────────────────
+
+export async function loadLibraryClips(category?: string, search?: string) {
+  let query = 'SELECT lc.*, COUNT(ln.id) AS note_count FROM library_clips lc LEFT JOIN library_notes ln ON ln.clip_id = lc.id'
+  const conditions: string[] = []
+  const params: unknown[] = []
+
+  if (category) {
+    params.push(category)
+    conditions.push(`lc.category = $${params.length}`)
+  }
+  if (search) {
+    params.push(`%${search}%`)
+    conditions.push(`(lc.name ILIKE $${params.length} OR lc.tags ILIKE $${params.length})`)
+  }
+
+  if (conditions.length) query += ' WHERE ' + conditions.join(' AND ')
+  query += ' GROUP BY lc.id ORDER BY lc.created_at DESC'
+
+  const res = await pool.query(query, params)
+  return res.rows.map((r: Record<string, unknown>) => ({
+    id: r.id,
+    name: r.name,
+    category: r.category,
+    clipType: r.clip_type,
+    durationBeats: r.duration_beats,
+    bpm: r.bpm,
+    color: r.color || undefined,
+    audioFileId: r.audio_file_id || undefined,
+    tags: r.tags || undefined,
+    noteCount: Number(r.note_count),
+    createdAt: r.created_at,
+  }))
+}
+
+export async function loadLibraryClip(id: string) {
+  const clipRes = await pool.query('SELECT * FROM library_clips WHERE id = $1', [id])
+  if (clipRes.rows.length === 0) return null
+  const r = clipRes.rows[0]
+
+  const notesRes = await pool.query(
+    'SELECT * FROM library_notes WHERE clip_id = $1 ORDER BY start_beat',
+    [id]
+  )
+
+  return {
+    id: r.id,
+    name: r.name,
+    category: r.category,
+    clipType: r.clip_type,
+    durationBeats: r.duration_beats,
+    bpm: r.bpm,
+    color: r.color || undefined,
+    audioFileId: r.audio_file_id || undefined,
+    tags: r.tags || undefined,
+    createdAt: r.created_at,
+    notes: notesRes.rows.map((n: Record<string, unknown>) => ({
+      id: n.id,
+      pitch: n.pitch,
+      startBeat: n.start_beat,
+      durationBeats: n.duration_beats,
+      velocity: n.velocity,
+    })),
+  }
+}
+
+export async function saveLibraryClip(clip: {
+  id: string
+  name: string
+  category: string
+  clipType: string
+  durationBeats: number
+  bpm: number
+  color?: string
+  audioFileId?: string
+  tags?: string
+  notes?: Array<{
+    id: string
+    pitch: number
+    startBeat: number
+    durationBeats: number
+    velocity: number
+  }>
+}) {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+
+    await client.query(
+      `INSERT INTO library_clips (id, name, category, clip_type, duration_beats, bpm, color, audio_file_id, tags)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT (id) DO UPDATE SET
+         name = EXCLUDED.name, category = EXCLUDED.category,
+         clip_type = EXCLUDED.clip_type, duration_beats = EXCLUDED.duration_beats,
+         bpm = EXCLUDED.bpm, color = EXCLUDED.color,
+         audio_file_id = EXCLUDED.audio_file_id, tags = EXCLUDED.tags`,
+      [clip.id, clip.name, clip.category, clip.clipType, clip.durationBeats, clip.bpm, clip.color || null, clip.audioFileId || null, clip.tags || null]
+    )
+
+    // Replace notes
+    await client.query('DELETE FROM library_notes WHERE clip_id = $1', [clip.id])
+    if (clip.notes) {
+      for (const note of clip.notes) {
+        await client.query(
+          `INSERT INTO library_notes (id, clip_id, pitch, start_beat, duration_beats, velocity)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [note.id, clip.id, note.pitch, note.startBeat, note.durationBeats, note.velocity]
+        )
+      }
+    }
+
+    await client.query('COMMIT')
+  } catch (err) {
+    await client.query('ROLLBACK')
+    throw err
+  } finally {
+    client.release()
+  }
+}
+
+export async function deleteLibraryClip(id: string): Promise<boolean> {
+  const res = await pool.query('DELETE FROM library_clips WHERE id = $1', [id])
+  return (res.rowCount ?? 0) > 0
+}
+
+export async function saveAudioFile(file: {
+  id: string
+  filename: string
+  mimeType: string
+  sizeBytes: number
+  durationSecs?: number
+  sampleRate?: number
+  data: Buffer
+}) {
+  await pool.query(
+    `INSERT INTO audio_files (id, filename, mime_type, size_bytes, duration_secs, sample_rate, data)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [file.id, file.filename, file.mimeType, file.sizeBytes, file.durationSecs ?? null, file.sampleRate ?? 44100, file.data]
+  )
+}
+
+export async function loadAudioFile(id: string) {
+  const res = await pool.query('SELECT * FROM audio_files WHERE id = $1', [id])
+  if (res.rows.length === 0) return null
+  const r = res.rows[0]
+  return {
+    id: r.id,
+    filename: r.filename,
+    mimeType: r.mime_type,
+    sizeBytes: r.size_bytes,
+    durationSecs: r.duration_secs,
+    sampleRate: r.sample_rate,
+    data: r.data as Buffer,
+    createdAt: r.created_at,
+  }
+}
+
+// ─── Project persistence ─────────────────────────────────────────────────────
+
 export async function saveProjectTree(project: {
   id: string
   name: string

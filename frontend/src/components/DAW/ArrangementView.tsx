@@ -5,6 +5,7 @@
  */
 import { useRef, useEffect, useCallback, useState } from 'react'
 import { useDAWStore } from '@/store/dawStore'
+import { ClipContextMenu } from './ClipContextMenu'
 import type { Track, Clip } from '@/types'
 
 const TRACK_HEIGHT = 64
@@ -440,6 +441,7 @@ export function ArrangementView() {
   const containerRef = useRef<HTMLDivElement>(null)
   const [canvasSize, setCanvasSize] = useState({ w: 0, h: 0 })
   const dashOffsetRef = useRef(0)
+  const [contextMenu, setContextMenu] = useState<{ clip: Clip; track: Track; x: number; y: number } | null>(null)
 
   const {
     tracks,
@@ -557,6 +559,19 @@ export function ArrangementView() {
     }
   }, [scrollLeft, setScrollLeft])
 
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    const rect = canvasRef.current!.getBoundingClientRect()
+    const cx = e.clientX - rect.left
+    const cy = e.clientY - rect.top
+    const { track, clip } = hitTest(cx, cy)
+    if (clip && track) {
+      setContextMenu({ clip, track, x: e.clientX, y: e.clientY })
+    } else {
+      setContextMenu(null)
+    }
+  }, [hitTest])
+
   return (
     <div ref={containerRef} className="relative flex-1 overflow-hidden" style={{ background: '#08090b' }}>
       <canvas
@@ -565,7 +580,17 @@ export function ArrangementView() {
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         onWheel={handleWheel}
+        onContextMenu={handleContextMenu}
       />
+      {contextMenu && (
+        <ClipContextMenu
+          clip={contextMenu.clip}
+          track={contextMenu.track}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   )
 }

@@ -2,7 +2,7 @@ import { useCallback, useState, useRef, useEffect } from 'react'
 import {
   Play, Pause, Square, Circle,
   SkipBack, Repeat,
-  ZoomIn, ZoomOut, Sparkles,
+  ZoomIn, ZoomOut, Sparkles, FolderOpen,
   ChevronUp, ChevronDown, Grid3x3,
 } from 'lucide-react'
 import { clsx } from 'clsx'
@@ -11,6 +11,7 @@ import { useAudioEngine } from '@/hooks/useAudioEngine'
 import { MIDIStatus } from './MIDIStatus'
 import { LEDIndicator } from '@/components/common/LEDIndicator'
 import { VUMeter, useSimulatedLevel } from '@/components/common/VUMeter'
+import { useLibraryStore } from '@/store/libraryStore'
 
 function BeatDisplay({ beat }: { beat: number }) {
   const bar = Math.floor(beat / 4) + 1
@@ -89,6 +90,7 @@ export function Transport() {
     toggleAIPanel, aiPanelOpen, quantizeClip, setQuantizeGrid,
   } = useDAWStore()
   const { play, pause, stop } = useAudioEngine()
+  const { sidebarOpen, toggleSidebar } = useLibraryStore()
   const masterLevel = useSimulatedLevel(transport.isPlaying ? 0.5 : 0.08, transport.isPlaying ? 0.2 : 0.04)
 
   const [quantizeOpen, setQuantizeOpen] = useState(false)
@@ -146,6 +148,20 @@ export function Transport() {
       </div>
 
       {/* Hardware groove */}
+      <div className="hardware-groove" />
+
+      {/* Browser toggle */}
+      <div className="flex flex-col items-center gap-0.5">
+        <button
+          onClick={toggleSidebar}
+          title="Browser (B)"
+          className={clsx('transport-btn', sidebarOpen && 'active')}
+        >
+          <FolderOpen size={12} />
+        </button>
+        <LEDIndicator on={sidebarOpen} color="cyan" size="xs" />
+      </div>
+
       <div className="hardware-groove" />
 
       {/* Transport button group */}

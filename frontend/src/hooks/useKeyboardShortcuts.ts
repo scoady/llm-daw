@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useDAWStore } from '@/store/dawStore'
+import { useLibraryStore } from '@/store/libraryStore'
 import { useAudioEngine } from './useAudioEngine'
 
 /**
@@ -22,6 +23,7 @@ export function useKeyboardShortcuts() {
     stopRecording,
     toggleAIPanel,
   } = useDAWStore()
+  const toggleSidebar = useLibraryStore((s) => s.toggleSidebar)
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -80,6 +82,10 @@ export function useKeyboardShortcuts() {
         case 'KeyA':
           if (!e.metaKey && !e.ctrlKey) toggleAIPanel()
           break
+
+        case 'KeyB':
+          if (!e.metaKey && !e.ctrlKey) toggleSidebar()
+          break
       }
     }
 
@@ -90,6 +96,6 @@ export function useKeyboardShortcuts() {
     zoomIn, zoomOut,
     selectedClipId, selectedTrackId, tracks,
     removeClip, removeTrack, openPianoRoll, addTrack,
-    startRecording, stopRecording, toggleAIPanel,
+    startRecording, stopRecording, toggleAIPanel, toggleSidebar,
   ])
 }

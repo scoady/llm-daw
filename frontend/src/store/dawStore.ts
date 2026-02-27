@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
-import type { Track, Clip, Note, TransportState, TrackType, MIDIDeviceInfo, Project } from '@/types'
+import type { Track, Clip, Note, TransportState, TrackType, MIDIDeviceInfo, Project, LibraryClip } from '@/types'
 import { projectsApi } from '@/services/apiClient'
 import { DEFAULT_PRESET_ID, migratePresetId } from '@/data/instrumentPresets'
 
@@ -137,6 +137,9 @@ interface DAWActions {
   saveProject(): Promise<void>
   loadProject(id: string): Promise<void>
   createProject(name: string, bpm?: number): Promise<string>
+
+  // Library
+  insertLibraryClip(clip: LibraryClip, trackId?: string): void
 
   // Bulk hydrate (for project load)
   hydrate(state: Partial<DAWState>): void
@@ -498,6 +501,37 @@ export const useDAWStore = create<DAWState & DAWActions>()(
         s.lastSavedAt = project.createdAt
       })
       return project.id
+    },
+
+    // ── Library
+    insertLibraryClip: (libClip, trackId) => {
+      const state = get()
+      const targetId = trackId ?? state.selectedTrackId
+      if (!targetId) return
+
+      const track = state.tracks.find((t) => t.id === targetId)
+      if (!track) return
+
+      const startBeat = state.transport.currentBeat
+      const clip: Clip = {
+        id: makeId(),
+        trackId: targetId,
+        name: libClip.name,
+        startBeat,
+        durationBeats: libClip.durationBeats,
+        color: libClip.color,
+        notes: libClip.clipType === 'midi' && libClip.notes
+          ? libClip.notes.map((n) => ({ ...n, id: makeId() }))
+          : undefined,
+        audioUrl: libClip.clipType === 'audio' && libClip.audioFileId
+          ? `/api/audio/${libClip.audioFileId}`
+          : undefined,
+      }
+
+      set((s) => {
+        const t = s.tracks.find((t) => t.id === targetId)
+        if (t) t.clips.push(clip)
+      })
     },
 
     // ── Hydrate

@@ -10,7 +10,9 @@ import { TrackPanel } from '@/components/DAW/TrackPanel'
 import { ArrangementView } from '@/components/DAW/ArrangementView'
 import { BottomPanel } from '@/components/DAW/BottomPanel'
 import { AIPanel } from '@/components/DAW/AIPanel'
+import { BrowserSidebar } from '@/components/DAW/Browser/BrowserSidebar'
 import { LEDIndicator } from '@/components/common/LEDIndicator'
+import { useLibraryStore } from '@/store/libraryStore'
 
 // ─── Status Bar ──────────────────────────────────────────────────────────────
 
@@ -135,6 +137,7 @@ export function ProjectPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { setProjectId, setProjectName, addTrack, tracks, aiPanelOpen, loadProject, createProject } = useDAWStore()
+  const sidebarOpen = useLibraryStore((s) => s.sidebarOpen)
   const [mixerHeight, setMixerHeight] = useState(320)
 
   useAudioEngine()
@@ -177,6 +180,19 @@ export function ProjectPage() {
 
       {/* Main workspace */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Browser sidebar (slide-in from left) */}
+        <div
+          className={clsx(
+            'overflow-hidden border-r border-border-subtle/50 transition-all duration-300 ease-in-out',
+            sidebarOpen ? 'w-[280px] opacity-100' : 'w-0 opacity-0'
+          )}
+          style={sidebarOpen ? {
+            boxShadow: '4px 0 16px rgba(0, 0, 0, 0.3), 1px 0 0 rgba(0, 212, 255, 0.05)',
+          } : undefined}
+        >
+          {sidebarOpen && <BrowserSidebar />}
+        </div>
+
         {/* Track panel + arrangement */}
         <div className="flex flex-1 min-w-0 overflow-hidden">
           <TrackPanel />

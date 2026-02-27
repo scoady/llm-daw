@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Project, Track, Note, AnalysisResult, Suggestion } from '@/types'
+import type { Project, Track, Note, AnalysisResult, Suggestion, LibraryClip, AudioFileInfo } from '@/types'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -50,27 +50,40 @@ export const tracksApi = {
 
 // ─── File Upload ──────────────────────────────────────────────────────────────
 export const uploadApi = {
-  audio: (file: File, projectId: string) => {
+  audio: (file: File) => {
     const form = new FormData()
     form.append('file', file)
-    form.append('projectId', projectId)
-    return api.post<{ url: string; filename: string }>(
+    return api.post<AudioFileInfo>(
       '/api/upload/audio',
       form,
       { headers: { 'Content-Type': 'multipart/form-data' } }
     ).then((r) => r.data)
   },
+}
 
-  midi: (file: File, projectId: string) => {
-    const form = new FormData()
-    form.append('file', file)
-    form.append('projectId', projectId)
-    return api.post<{ url: string; filename: string; notes: unknown[] }>(
-      '/api/upload/midi',
-      form,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
-    ).then((r) => r.data)
+// ─── Library ──────────────────────────────────────────────────────────────────
+export const libraryApi = {
+  list: (category?: string, search?: string) => {
+    const params = new URLSearchParams()
+    if (category) params.set('category', category)
+    if (search) params.set('search', search)
+    const qs = params.toString()
+    return api.get<LibraryClip[]>(`/api/library/clips${qs ? `?${qs}` : ''}`).then((r) => r.data)
   },
+
+  get: (id: string) =>
+    api.get<LibraryClip>(`/api/library/clips/${id}`).then((r) => r.data),
+
+  save: (clip: LibraryClip) =>
+    api.post<{ ok: boolean; id: string }>('/api/library/clips', clip).then((r) => r.data),
+
+  delete: (id: string) =>
+    api.delete(`/api/library/clips/${id}`).then((r) => r.data),
+}
+
+// ─── Audio file URL helper ──────────────────────────────────────────────────
+export function audioFileUrl(id: string): string {
+  return `${API_BASE}/api/audio/${id}`
 }
 
 // ─── AI Analysis & Generation ─────────────────────────────────────────────────

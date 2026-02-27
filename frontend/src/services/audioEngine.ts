@@ -422,6 +422,10 @@ class AudioEngine {
         const part = this.scheduleClipNotes(clip, ch)
         if (part) ch.parts.push(part)
       }
+      if (clip.audioUrl && track.type === 'audio') {
+        const event = this.scheduleAudioClip(clip, ch)
+        if (event) ch.parts.push(event as unknown as Tone.Part)
+      }
     }
   }
 
@@ -509,6 +513,49 @@ class AudioEngine {
         Tone.now()
       )
       setTimeout(() => synth.dispose(), 1000)
+    }
+  }
+
+  // ── Audio clip playback ──────────────────────────────────────────────────
+
+  async loadAudioClip(trackId: string, audioUrl: string): Promise<void> {
+    const ch = this.channels.get(trackId)
+    if (!ch) return
+
+    // Dispose existing player
+    if (ch.player) {
+      ch.player.stop()
+      ch.player.dispose()
+    }
+
+    const player = new Tone.Player(audioUrl).connect(ch.channel)
+    ch.player = player
+    await player.load(audioUrl)
+  }
+
+  private scheduleAudioClip(clip: Clip, ch: EngineChannel): Tone.ToneEvent | null {
+    if (!ch.player || !clip.audioUrl) return null
+
+    const bpm = Tone.getTransport().bpm.value
+    const secPerBeat = 60 / bpm
+    const startTime = clip.startBeat * secPerBeat
+
+    const player = ch.player
+    const event = new Tone.ToneEvent((time) => {
+      player.start(time)
+    })
+    event.start(startTime)
+    return event
+  }
+
+  async previewAudioFile(url: string): Promise<void> {
+    await this.init()
+    const player = new Tone.Player(url).connect(this.masterGain)
+    await player.load(url)
+    player.start()
+    // Dispose after playback
+    player.onstop = () => {
+      setTimeout(() => player.dispose(), 100)
     }
   }
 

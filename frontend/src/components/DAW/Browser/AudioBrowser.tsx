@@ -1,0 +1,70 @@
+import { useState, useCallback } from 'react'
+import { Headphones } from 'lucide-react'
+import { useLibraryStore } from '@/store/libraryStore'
+import { useDAWStore } from '@/store/dawStore'
+import { audioFileUrl } from '@/services/apiClient'
+import { audioEngine } from '@/services/audioEngine'
+import { AudioUploadZone } from './AudioUploadZone'
+import { AudioFileCard } from './AudioFileCard'
+import type { AudioFileInfo } from '@/types'
+
+export function AudioBrowser() {
+  const { audioFiles, isUploading, uploadAudioFile } = useLibraryStore()
+  const { insertLibraryClip } = useDAWStore()
+  const [previewingId, setPreviewingId] = useState<string | null>(null)
+
+  const handleUpload = useCallback((file: File) => {
+    uploadAudioFile(file)
+  }, [uploadAudioFile])
+
+  const handlePreview = useCallback(async (file: AudioFileInfo) => {
+    setPreviewingId(file.id)
+    const url = audioFileUrl(file.id)
+    await audioEngine.previewAudioFile(url)
+    setTimeout(() => setPreviewingId(null), 3000)
+  }, [])
+
+  const handleInsert = useCallback((file: AudioFileInfo) => {
+    insertLibraryClip({
+      id: crypto.randomUUID(),
+      name: file.filename,
+      category: 'uncategorized',
+      clipType: 'audio',
+      durationBeats: file.durationSecs ? Math.ceil(file.durationSecs * 2) : 8,
+      bpm: 120,
+      audioFileId: file.id,
+      createdAt: new Date().toISOString(),
+    })
+  }, [insertLibraryClip])
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Upload zone */}
+      <AudioUploadZone isUploading={isUploading} onUpload={handleUpload} />
+
+      {/* File list */}
+      <div className="flex-1 overflow-y-auto scrollbar-hide mt-2">
+        {audioFiles.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 gap-2">
+            <Headphones size={24} className="text-text-muted/30" />
+            <span className="text-2xs font-lcd text-text-muted/60 text-center px-4">
+              No audio files uploaded.
+              <br />
+              Drop files above to get started.
+            </span>
+          </div>
+        ) : (
+          audioFiles.map((file) => (
+            <AudioFileCard
+              key={file.id}
+              file={file}
+              isPreviewing={previewingId === file.id}
+              onPreview={handlePreview}
+              onInsert={handleInsert}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  )
+}

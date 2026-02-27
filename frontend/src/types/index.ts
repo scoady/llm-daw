@@ -57,6 +57,33 @@ export interface Project {
   updatedAt: string
 }
 
+// ─── Library / Audio ────────────────────────────────────────────────────────
+
+export type LibraryClipCategory = 'drums' | 'bass' | 'melody' | 'chords' | 'pads' | 'fx' | 'uncategorized'
+
+export interface LibraryClip {
+  id: string
+  name: string
+  category: LibraryClipCategory
+  clipType: 'midi' | 'audio'
+  durationBeats: number
+  bpm: number
+  color?: string
+  tags?: string
+  notes?: Note[]
+  audioFileId?: string
+  noteCount?: number
+  createdAt: string
+}
+
+export interface AudioFileInfo {
+  id: string
+  filename: string
+  mimeType: string
+  sizeBytes: number
+  durationSecs?: number
+}
+
 // ─── Playback / Transport ────────────────────────────────────────────────────
 
 export interface TransportState {
