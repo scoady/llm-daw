@@ -441,7 +441,7 @@ export function MasterEQ() {
         {/* Spectrum analyzer + EQ controls */}
         <div className="flex flex-col flex-1 min-w-0">
           {/* Spectrum canvas */}
-          <div className="flex-1 p-2 pb-0 min-h-0">
+          <div className="flex flex-col flex-1 p-2 pb-0 min-h-0">
             <SpectrumAnalyzer
               eqLow={masterEQ.low}
               eqMid={masterEQ.mid}
