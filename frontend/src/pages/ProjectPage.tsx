@@ -8,8 +8,7 @@ import { useMIDIInput } from '@/hooks/useMIDIInput'
 import { Transport } from '@/components/DAW/Transport'
 import { TrackPanel } from '@/components/DAW/TrackPanel'
 import { ArrangementView } from '@/components/DAW/ArrangementView'
-import { Mixer } from '@/components/DAW/Mixer'
-import { PianoRoll } from '@/components/DAW/PianoRoll'
+import { BottomPanel } from '@/components/DAW/BottomPanel'
 import { AIPanel } from '@/components/DAW/AIPanel'
 import { LEDIndicator } from '@/components/common/LEDIndicator'
 
@@ -136,7 +135,7 @@ export function ProjectPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { setProjectId, setProjectName, addTrack, tracks, aiPanelOpen, loadProject, createProject } = useDAWStore()
-  const [mixerHeight, setMixerHeight] = useState(280)
+  const [mixerHeight, setMixerHeight] = useState(320)
 
   useAudioEngine()
   useKeyboardShortcuts()
@@ -168,7 +167,7 @@ export function ProjectPage() {
   }, [id])
 
   const handleMixerResize = useCallback((delta: number) => {
-    setMixerHeight((prev) => Math.max(160, Math.min(400, prev - delta)))
+    setMixerHeight((prev) => Math.max(160, Math.min(500, prev - delta)))
   }, [])
 
   return (
@@ -201,13 +200,10 @@ export function ProjectPage() {
       {/* Resize grip */}
       <ResizeGrip onResize={handleMixerResize} />
 
-      {/* Mixer */}
+      {/* Bottom panel (tabbed: MIXER | EDITOR | MASTER) */}
       <div style={{ height: mixerHeight }}>
-        <Mixer />
+        <BottomPanel />
       </div>
-
-      {/* Piano roll modal */}
-      <PianoRoll />
 
       {/* Status bar */}
       <StatusBar />

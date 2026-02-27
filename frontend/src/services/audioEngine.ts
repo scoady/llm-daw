@@ -230,14 +230,24 @@ interface EngineChannel {
 class AudioEngine {
   private channels = new Map<string, EngineChannel>()
   private masterGain: Tone.Gain
+  private masterEQ: Tone.EQ3
   private masterLimiter: Tone.Limiter
+  private masterAnalyser: Tone.Analyser
   private initialized = false
 
   constructor() {
     this.masterGain    = new Tone.Gain(0.9)
+    this.masterEQ      = new Tone.EQ3(0, 0, 0)
     this.masterLimiter = new Tone.Limiter(-1)
-    this.masterGain.connect(this.masterLimiter)
+    this.masterAnalyser = new Tone.Analyser('fft', 256)
+
+    // Chain: gain → EQ → limiter → destination
+    this.masterGain.connect(this.masterEQ)
+    this.masterEQ.connect(this.masterLimiter)
     this.masterLimiter.toDestination()
+
+    // Tap for spectrum viz (parallel, not in signal path)
+    this.masterGain.connect(this.masterAnalyser)
   }
 
   async init(): Promise<void> {
@@ -502,11 +512,24 @@ class AudioEngine {
     }
   }
 
+  // ── Master EQ ──────────────────────────────────────────────────────────────
+  setMasterEQ(low: number, mid: number, high: number): void {
+    this.masterEQ.low.value = low
+    this.masterEQ.mid.value = mid
+    this.masterEQ.high.value = high
+  }
+
+  getFrequencyData(): Float32Array {
+    return this.masterAnalyser.getValue() as Float32Array
+  }
+
   // ── Cleanup ───────────────────────────────────────────────────────────────
   dispose(): void {
     this.stop()
     for (const [id] of this.channels) this.removeChannel(id)
     this.masterGain.dispose()
+    this.masterEQ.dispose()
+    this.masterAnalyser.dispose()
     this.masterLimiter.dispose()
   }
 }

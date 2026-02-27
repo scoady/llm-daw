@@ -177,16 +177,7 @@ export function Mixer() {
   const { tracks } = useDAWStore()
 
   return (
-    <div className="flex flex-col border-t border-border-subtle h-full">
-      {/* Mixer header */}
-      <div className="mixer-header flex items-center px-3 py-1.5">
-        <LEDIndicator on color="cyan" size="xs" />
-        <span className="text-2xs text-text-muted uppercase font-lcd tracking-[0.15em] font-medium ml-2">
-          Mixer
-        </span>
-        <span className="text-2xs text-text-muted font-lcd ml-2">({tracks.length}ch)</span>
-      </div>
-
+    <div className="flex flex-col h-full">
       {/* Channel strips */}
       <div className="flex flex-1 overflow-x-auto">
         <MasterStrip />

@@ -44,6 +44,10 @@ interface DAWState {
   pianoRollOpen: boolean
   pianoRollClipId: string | null
 
+  // Bottom panel
+  bottomTab: 'mixer' | 'editor' | 'master'
+  masterEQ: { low: number; mid: number; high: number }
+
   // MIDI input
   midiDevices: MIDIDeviceInfo[]
   selectedMidiDeviceId: string | null
@@ -109,6 +113,10 @@ interface DAWActions {
   openPianoRoll(clipId: string): void
   closePianoRoll(): void
 
+  // Bottom panel
+  setBottomTab(tab: 'mixer' | 'editor' | 'master'): void
+  setMasterEQ(band: 'low' | 'mid' | 'high', value: number): void
+
   // MIDI input
   setMidiDevices(devices: MIDIDeviceInfo[]): void
   selectMidiDevice(id: string | null): void
@@ -160,6 +168,10 @@ export const useDAWStore = create<DAWState & DAWActions>()(
     totalBeats: 128,
     pianoRollOpen: false,
     pianoRollClipId: null,
+
+    // Bottom panel
+    bottomTab: 'mixer' as const,
+    masterEQ: { low: 0, mid: 0, high: 0 },
 
     // MIDI input
     midiDevices: [],
@@ -343,8 +355,12 @@ export const useDAWStore = create<DAWState & DAWActions>()(
     zoomOut: () => set((s) => { s.pixelsPerBeat = Math.max(10,  s.pixelsPerBeat * 0.8)  }),
 
     // ── Piano roll
-    openPianoRoll:  (clipId) => set((s) => { s.pianoRollOpen = true; s.pianoRollClipId = clipId }),
+    openPianoRoll:  (clipId) => set((s) => { s.pianoRollOpen = true; s.pianoRollClipId = clipId; s.bottomTab = 'editor' }),
     closePianoRoll: ()       => set((s) => { s.pianoRollOpen = false; s.pianoRollClipId = null }),
+
+    // ── Bottom panel
+    setBottomTab: (tab) => set((s) => { s.bottomTab = tab }),
+    setMasterEQ: (band, value) => set((s) => { s.masterEQ[band] = value }),
 
     // ── MIDI input
     setMidiDevices: (devices) => set((s) => { s.midiDevices = devices }),
