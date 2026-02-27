@@ -602,7 +602,6 @@ const QUICK_ACTIONS = [
 // ─── Chat View ──────────────────────────────────────────────────────────────
 
 function ChatView() {
-  const { tracks, selectedClipId, selectedTrackId, bpm } = useDAWStore()
   const {
     chatMessages, isChatting,
     addChatMessage, updateChatMessage, setChatting, setChatError,
