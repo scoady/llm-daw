@@ -48,7 +48,7 @@ export const tracksApi = {
     api.delete(`/api/projects/${projectId}/tracks/${trackId}`).then((r) => r.data),
 }
 
-// ─── File Upload ──────────────────────────────────────────────────────────────
+// ─── File Upload + Audio Files ────────────────────────────────────────────────
 export const uploadApi = {
   audio: (file: File) => {
     const form = new FormData()
@@ -59,6 +59,9 @@ export const uploadApi = {
       { headers: { 'Content-Type': 'multipart/form-data' } }
     ).then((r) => r.data)
   },
+
+  listAudio: () =>
+    api.get<AudioFileInfo[]>('/api/audio').then((r) => r.data),
 }
 
 // ─── Library ──────────────────────────────────────────────────────────────────

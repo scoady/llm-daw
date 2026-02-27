@@ -46,7 +46,8 @@ export async function initDB(): Promise<void> {
       name           TEXT NOT NULL DEFAULT 'Clip',
       start_beat     REAL NOT NULL DEFAULT 0,
       duration_beats REAL NOT NULL DEFAULT 4,
-      color          TEXT
+      color          TEXT,
+      audio_url      TEXT
     );
 
     CREATE TABLE IF NOT EXISTS notes (
@@ -99,6 +100,15 @@ export async function initDB(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_library_notes_clip ON library_notes(clip_id);
     CREATE INDEX IF NOT EXISTS idx_library_clips_category ON library_clips(category);
   `)
+
+  // ── Migrations for existing databases ──────────────────────────────────────
+  // Add audio_url column to clips if it doesn't exist (safe to run repeatedly)
+  await pool.query(`
+    DO $$ BEGIN
+      ALTER TABLE clips ADD COLUMN audio_url TEXT;
+    EXCEPTION WHEN duplicate_column THEN NULL;
+    END $$;
+  `)
 }
 
 /**
@@ -136,6 +146,7 @@ export async function loadProjectTree(projectId: string) {
         startBeat: clip.start_beat,
         durationBeats: clip.duration_beats,
         color: clip.color || undefined,
+        audioUrl: clip.audio_url || undefined,
         notes: notesRes.rows.map((n: Record<string, unknown>) => ({
           id: n.id,
           pitch: n.pitch,
@@ -338,6 +349,21 @@ export async function saveAudioFile(file: {
   )
 }
 
+export async function listAudioFiles() {
+  const res = await pool.query(
+    'SELECT id, filename, mime_type, size_bytes, duration_secs, sample_rate, created_at FROM audio_files ORDER BY created_at DESC'
+  )
+  return res.rows.map((r: Record<string, unknown>) => ({
+    id: r.id,
+    filename: r.filename,
+    mimeType: r.mime_type,
+    sizeBytes: r.size_bytes,
+    durationSecs: r.duration_secs,
+    sampleRate: r.sample_rate,
+    createdAt: r.created_at,
+  }))
+}
+
 export async function loadAudioFile(id: string) {
   const res = await pool.query('SELECT * FROM audio_files WHERE id = $1', [id])
   if (res.rows.length === 0) return null
@@ -379,6 +405,7 @@ export async function saveProjectTree(project: {
       startBeat: number
       durationBeats: number
       color?: string
+      audioUrl?: string
       notes?: Array<{
         id: string
         pitch: number
@@ -421,9 +448,9 @@ export async function saveProjectTree(project: {
 
       for (const clip of track.clips) {
         await client.query(
-          `INSERT INTO clips (id, track_id, name, start_beat, duration_beats, color)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [clip.id, track.id, clip.name, clip.startBeat, clip.durationBeats, clip.color || null]
+          `INSERT INTO clips (id, track_id, name, start_beat, duration_beats, color, audio_url)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [clip.id, track.id, clip.name, clip.startBeat, clip.durationBeats, clip.color || null, clip.audioUrl || null]
         )
 
         if (clip.notes) {

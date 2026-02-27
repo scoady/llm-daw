@@ -7,7 +7,7 @@ import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import Anthropic from '@anthropic-ai/sdk'
 import multipart from '@fastify/multipart'
-import { initDB, pool, loadProjectTree, saveProjectTree, loadLibraryClips, loadLibraryClip, saveLibraryClip, deleteLibraryClip, saveAudioFile, loadAudioFile } from './db.js'
+import { initDB, pool, loadProjectTree, saveProjectTree, loadLibraryClips, loadLibraryClip, saveLibraryClip, deleteLibraryClip, listAudioFiles, saveAudioFile, loadAudioFile } from './db.js'
 
 const PORT = parseInt(process.env.PORT ?? '4000')
 const CORS_ORIGIN = process.env.CORS_ORIGIN ?? 'http://localhost:5173'
@@ -305,6 +305,11 @@ app.delete<{ Params: { id: string } }>('/api/library/clips/:id', async (request,
 })
 
 // ── Audio upload + streaming ────────────────────────────────────────────────
+
+// List all uploaded audio files (metadata only, no binary data)
+app.get('/api/audio', async () => {
+  return listAudioFiles()
+})
 
 // Upload audio file
 app.post('/api/upload/audio', async (request, reply) => {

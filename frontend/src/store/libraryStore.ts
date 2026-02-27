@@ -23,6 +23,7 @@ interface LibraryActions {
   setSearchQuery(query: string): void
   setPreviewingClipId(id: string | null): void
   fetchClips(): Promise<void>
+  fetchAudioFiles(): Promise<void>
   saveClipToLibrary(clip: LibraryClip): Promise<void>
   deleteClip(id: string): Promise<void>
   uploadAudioFile(file: File): Promise<AudioFileInfo>
@@ -57,6 +58,15 @@ export const useLibraryStore = create<LibraryState & LibraryActions>()(
         set((s) => { s.clips = clips; s.isLoading = false })
       } catch {
         set((s) => { s.isLoading = false })
+      }
+    },
+
+    fetchAudioFiles: async () => {
+      try {
+        const files = await uploadApi.listAudio()
+        set((s) => { s.audioFiles = files })
+      } catch {
+        // silently fail — API may be unavailable
       }
     },
 

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Headphones } from 'lucide-react'
 import { useLibraryStore } from '@/store/libraryStore'
 import { useDAWStore } from '@/store/dawStore'
@@ -9,9 +9,14 @@ import { AudioFileCard } from './AudioFileCard'
 import type { AudioFileInfo } from '@/types'
 
 export function AudioBrowser() {
-  const { audioFiles, isUploading, uploadAudioFile } = useLibraryStore()
+  const { audioFiles, isUploading, uploadAudioFile, fetchAudioFiles } = useLibraryStore()
   const { addTrack, selectTrack, bpm } = useDAWStore()
   const [previewingId, setPreviewingId] = useState<string | null>(null)
+
+  // Load audio files from DB on mount
+  useEffect(() => {
+    fetchAudioFiles()
+  }, [fetchAudioFiles])
 
   const handleUpload = useCallback((file: File) => {
     uploadAudioFile(file)
