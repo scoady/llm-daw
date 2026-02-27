@@ -209,3 +209,40 @@ export interface AccompanyResult {
   }
   tracks: AccompanyTrack[]
 }
+
+// ─── AI Chat ────────────────────────────────────────────────────────────────
+
+export type ChatRole = 'user' | 'assistant'
+
+export interface ChatMessage {
+  id: string
+  role: ChatRole
+  content: string
+  timestamp: number
+  actions?: ChatAction[]
+  isLoading?: boolean
+  error?: string
+}
+
+export type ChatAction =
+  | { type: 'transpose'; semitones: number }
+  | { type: 'quantize'; division: number }
+  | { type: 'setVelocity'; velocity: number }
+  | { type: 'setVelocityRange'; min: number; max: number }
+  | { type: 'reverse' }
+  | { type: 'timeStretch'; factor: number }
+  | { type: 'deleteNotes'; filter?: { pitchBelow?: number; pitchAbove?: number; velocityBelow?: number } }
+  | { type: 'setBpm'; bpm: number }
+  | { type: 'replaceNotes'; notes: Omit<Note, 'id'>[] }
+  | { type: 'addNotes'; notes: Omit<Note, 'id'>[] }
+  | { type: 'addTrack'; trackType: TrackType; name: string; presetId?: string; notes?: Omit<Note, 'id'>[]; durationBeats?: number }
+
+export interface ChatContext {
+  notes: Omit<Note, 'id'>[]
+  bpm: number
+  trackName?: string
+  trackType?: TrackType
+  clipName?: string
+  presetId?: string
+  totalTracks: number
+}

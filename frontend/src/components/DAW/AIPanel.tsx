@@ -1,21 +1,22 @@
-import { useCallback, useRef, useEffect } from 'react'
+import { useCallback, useRef, useEffect, useState } from 'react'
 import {
   Sparkles, Play, Square, Plus, Send,
   Music, Waves, ArrowRight, Loader2,
   X, Zap, Activity, Wand2,
-  Volume2, Keyboard, Mic,
+  Volume2, Keyboard, Mic, MessageSquare,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useDAWStore, selectClipById } from '@/store/dawStore'
 import { useAIStore } from '@/store/aiStore'
 import { aiClient } from '@/services/apiClient'
+import { executeChatActions } from '@/services/chatActionExecutor'
 import { audioEngine, createSynthFromPreset } from '@/services/audioEngine'
 import { getPreset, DEFAULT_PRESET_ID } from '@/data/instrumentPresets'
 import { midiToNoteName, isBlackKey } from '@/services/midiService'
 import { Button } from '@/components/common/Button'
 import { LEDIndicator } from '@/components/common/LEDIndicator'
 import { LogoIcon } from '@/components/common/LogoIcon'
-import type { Note, Suggestion, AccompanyRole } from '@/types'
+import type { Note, Suggestion, AccompanyRole, ChatMessage, ChatContext } from '@/types'
 import * as Tone from 'tone'
 
 // ─── Oscilloscope Canvas ────────────────────────────────────────────────────
@@ -525,6 +526,287 @@ function AIThinking() {
 
 // ─── Main AI Panel ──────────────────────────────────────────────────────────
 
+// ─── Chat Bubble ──────────────────────────────────────────────────────────
+
+function ChatBubble({ message }: { message: ChatMessage }) {
+  const isUser = message.role === 'user'
+
+  if (message.isLoading) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2">
+        <LEDIndicator on color="accent" size="xs" pulse />
+        <span className="text-[10px] text-accent animate-pulse"
+          style={{ textShadow: '0 0 6px rgba(108,99,255,0.5)' }}
+        >
+          Thinking...
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div className={clsx('flex flex-col gap-1', isUser ? 'items-end' : 'items-start')}>
+      <div
+        className={clsx(
+          'max-w-[90%] rounded-lg px-3 py-2 text-xs leading-relaxed',
+          isUser
+            ? 'text-text-primary'
+            : message.error
+              ? 'text-neon-red/80'
+              : 'text-text-secondary'
+        )}
+        style={{
+          background: isUser
+            ? 'linear-gradient(180deg, rgba(108, 99, 255, 0.15) 0%, rgba(108, 99, 255, 0.08) 100%)'
+            : 'linear-gradient(180deg, #141824 0%, #0f1218 100%)',
+          border: isUser
+            ? '1px solid rgba(108, 99, 255, 0.25)'
+            : message.error
+              ? '1px solid rgba(255, 46, 99, 0.25)'
+              : '1px solid rgba(45, 51, 72, 0.4)',
+        }}
+      >
+        {message.content}
+      </div>
+      {message.actions && message.actions.length > 0 && (
+        <div className="flex flex-wrap gap-1 max-w-[90%]">
+          {message.actions.map((action, i) => (
+            <span
+              key={i}
+              className="text-[8px] px-1.5 py-0.5 rounded font-mono text-neon-green/80"
+              style={{
+                background: 'rgba(57, 255, 20, 0.08)',
+                border: '1px solid rgba(57, 255, 20, 0.15)',
+              }}
+            >
+              {action.type}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Chat Quick Actions ──────────────────────────────────────────────────────
+
+const QUICK_ACTIONS = [
+  { label: '+1 Octave', command: 'Transpose up 1 octave' },
+  { label: '-1 Octave', command: 'Transpose down 1 octave' },
+  { label: 'Quantize 1/8', command: 'Quantize to 1/8 notes' },
+  { label: 'Humanize', command: 'Randomize velocities between 70 and 110 for a human feel' },
+  { label: 'Jazz it up', command: 'Rewrite this melody in a jazz style' },
+  { label: 'Add bass', command: 'Add a bass line track that fits these notes' },
+]
+
+// ─── Chat View ──────────────────────────────────────────────────────────────
+
+function ChatView() {
+  const { tracks, selectedClipId, selectedTrackId, bpm } = useDAWStore()
+  const {
+    chatMessages, isChatting,
+    addChatMessage, updateChatMessage, setChatting, setChatError,
+  } = useAIStore()
+
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [input, setInput] = useState('')
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [chatMessages])
+
+  const buildContext = useCallback((): ChatContext => {
+    const state = useDAWStore.getState()
+    const selectedClip = state.selectedClipId
+      ? selectClipById(state.selectedClipId)(state)
+      : undefined
+    const selectedTrack = state.selectedTrackId
+      ? state.tracks.find((t) => t.id === state.selectedTrackId)
+      : undefined
+
+    const clipNotes = selectedClip?.notes ?? []
+    const allNotes = clipNotes.length > 0
+      ? clipNotes
+      : state.tracks.flatMap((t) => t.clips.flatMap((c) => c.notes ?? []))
+
+    return {
+      notes: allNotes.map((n) => ({
+        pitch: n.pitch,
+        startBeat: n.startBeat,
+        durationBeats: n.durationBeats,
+        velocity: n.velocity,
+      })),
+      bpm: state.bpm,
+      trackName: selectedTrack?.name,
+      trackType: selectedTrack?.type,
+      clipName: selectedClip?.name,
+      presetId: selectedTrack?.instrument?.presetId,
+      totalTracks: state.tracks.length,
+    }
+  }, [])
+
+  const handleSend = useCallback(async () => {
+    const text = input.trim()
+    if (!text || isChatting) return
+
+    setInput('')
+
+    const userMsg: ChatMessage = {
+      id: Math.random().toString(36).slice(2, 10),
+      role: 'user',
+      content: text,
+      timestamp: Date.now(),
+    }
+    addChatMessage(userMsg)
+
+    const assistantId = Math.random().toString(36).slice(2, 10)
+    addChatMessage({
+      id: assistantId,
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now(),
+      isLoading: true,
+    })
+
+    setChatting(true)
+    setChatError(null)
+
+    try {
+      const context = buildContext()
+      const history = chatMessages
+        .filter((m) => !m.isLoading && !m.error)
+        .map((m) => ({ role: m.role, content: m.content }))
+
+      const response = await aiClient.chat(text, context, history)
+
+      // Execute actions
+      const clipId = useDAWStore.getState().selectedClipId
+      if (response.actions?.length) {
+        executeChatActions(response.actions, clipId)
+      }
+
+      // Handle generated notes
+      if (response.generatedNotes?.length && clipId) {
+        const store = useDAWStore.getState()
+        for (const note of response.generatedNotes) {
+          store.addNote(clipId, note)
+        }
+      }
+
+      updateChatMessage(assistantId, {
+        content: response.message,
+        actions: response.actions,
+        isLoading: false,
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Chat failed'
+      updateChatMessage(assistantId, {
+        content: 'Failed to get a response.',
+        error: msg,
+        isLoading: false,
+      })
+    } finally {
+      setChatting(false)
+    }
+  }, [input, isChatting, chatMessages, addChatMessage, updateChatMessage, setChatting, setChatError, buildContext])
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
+    }
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Messages */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-hide p-3 space-y-3">
+        {chatMessages.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+            <MessageSquare size={24} className="text-accent/40 mb-3" />
+            <p className="text-xs text-text-muted">
+              Ask me to modify your notes or generate new music.
+            </p>
+            <p className="text-[9px] text-text-muted/60 mt-1">
+              e.g. &quot;transpose up 1 octave&quot;, &quot;rewrite in jazz style&quot;
+            </p>
+          </div>
+        )}
+        {chatMessages.map((msg) => (
+          <ChatBubble key={msg.id} message={msg} />
+        ))}
+      </div>
+
+      {/* Quick actions */}
+      <div className="px-3 pb-2 flex flex-wrap gap-1">
+        {QUICK_ACTIONS.map((qa) => (
+          <button
+            key={qa.label}
+            onClick={() => { setInput(qa.command); inputRef.current?.focus() }}
+            className="text-[8px] px-1.5 py-0.5 rounded text-text-muted transition-all hover:text-accent"
+            style={{
+              background: 'rgba(108, 99, 255, 0.04)',
+              border: '1px solid rgba(45, 51, 72, 0.3)',
+            }}
+          >
+            {qa.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Input */}
+      <div className="px-3 pb-3">
+        <div className="relative">
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Ask AI to modify or generate..."
+            rows={2}
+            className="w-full rounded-md px-3 py-2 pr-10 text-xs text-text-primary
+                       placeholder:text-text-muted/50 resize-none
+                       focus:outline-none transition-all"
+            style={{
+              background: 'linear-gradient(180deg, #0a0c14 0%, #080a10 100%)',
+              border: '1px solid rgba(45, 51, 72, 0.5)',
+              boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)',
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(108, 99, 255, 0.4)'
+              e.currentTarget.style.boxShadow = 'inset 0 1px 3px rgba(0,0,0,0.4), 0 0 8px rgba(108, 99, 255, 0.15)'
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(45, 51, 72, 0.5)'
+              e.currentTarget.style.boxShadow = 'inset 0 1px 3px rgba(0,0,0,0.4)'
+            }}
+          />
+          <button
+            onClick={handleSend}
+            disabled={isChatting || !input.trim()}
+            className={clsx(
+              'absolute bottom-2 right-2 p-1.5 rounded transition-all',
+              isChatting || !input.trim()
+                ? 'text-text-muted cursor-not-allowed'
+                : 'text-accent hover:bg-accent/10 cursor-pointer'
+            )}
+            style={!(isChatting || !input.trim()) ? {
+              filter: 'drop-shadow(0 0 4px rgba(108,99,255,0.4))',
+            } : undefined}
+          >
+            {isChatting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Accompany Styles / Role Config ─────────────────────────────────────────
+
 const ACCOMPANY_STYLES = ['Pop', 'Jazz', 'Rock', 'Electronic', 'Lo-fi', 'Classical'] as const
 
 const ROLE_ICONS: Record<AccompanyRole, typeof Music> = {
@@ -572,6 +854,8 @@ export function AIPanel() {
     accompanyStyle,
     setAccompanyStyle,
   } = useAIStore()
+
+  const [activeTab, setActiveTab] = useState<'assist' | 'chat'>('assist')
 
   // Track the instrument hint for the current prompt
   const instrumentHintRef = useRef<string | undefined>(undefined)
@@ -712,6 +996,34 @@ export function AIPanel() {
         </button>
       </div>
 
+      {/* Tab bar */}
+      <div
+        className="flex border-b border-border-subtle/50"
+        style={{ background: 'linear-gradient(180deg, #0e1018 0%, #0c0e16 100%)' }}
+      >
+        {(['assist', 'chat'] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={clsx(
+              'flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-medium uppercase tracking-[0.12em] transition-all',
+              activeTab === tab
+                ? 'text-accent border-b-2 border-accent'
+                : 'text-text-muted hover:text-text-secondary border-b-2 border-transparent'
+            )}
+            style={activeTab === tab ? { textShadow: '0 0 8px rgba(108,99,255,0.4)' } : undefined}
+          >
+            {tab === 'chat' && <MessageSquare size={10} />}
+            {tab === 'assist' ? 'Assist' : 'Chat'}
+          </button>
+        ))}
+      </div>
+
+      {/* Chat tab */}
+      {activeTab === 'chat' && <ChatView />}
+
+      {/* Assist tab */}
+      {activeTab === 'assist' && <>
       {/* Oscilloscope */}
       <div className="px-3 pt-3">
         <Oscilloscope active={isGenerating} />
@@ -1091,6 +1403,7 @@ export function AIPanel() {
           </div>
         )}
       </div>
+      </>}
     </div>
   )
 }

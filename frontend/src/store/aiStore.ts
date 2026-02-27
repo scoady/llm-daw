@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
-import type { AIGenerationMode, AnalysisResult, Suggestion, AccompanyResult } from '@/types'
+import type { AIGenerationMode, AnalysisResult, Suggestion, AccompanyResult, ChatMessage } from '@/types'
 
 interface AIState {
   isGenerating: boolean
@@ -31,6 +31,11 @@ interface AIState {
   isAccompanying: boolean
   accompanyResult: AccompanyResult | null
   accompanyStyle: string
+
+  // Chat
+  chatMessages: ChatMessage[]
+  isChatting: boolean
+  chatError: string | null
 }
 
 interface AIActions {
@@ -50,6 +55,11 @@ interface AIActions {
   setAccompanying(v: boolean): void
   setAccompanyResult(result: AccompanyResult | null): void
   setAccompanyStyle(style: string): void
+  addChatMessage(msg: ChatMessage): void
+  updateChatMessage(id: string, patch: Partial<ChatMessage>): void
+  setChatting(v: boolean): void
+  setChatError(err: string | null): void
+  clearChat(): void
   clearResults(): void
 }
 
@@ -71,6 +81,9 @@ export const useAIStore = create<AIState & AIActions>()(
     isAccompanying: false,
     accompanyResult: null,
     accompanyStyle: 'pop',
+    chatMessages: [],
+    isChatting: false,
+    chatError: null,
 
     setGenerating: (v)       => set((s) => { s.isGenerating = v }),
     setError:      (err)     => set((s) => { s.error = err }),
@@ -88,6 +101,14 @@ export const useAIStore = create<AIState & AIActions>()(
     setAccompanying: (v) => set((s) => { s.isAccompanying = v }),
     setAccompanyResult: (result) => set((s) => { s.accompanyResult = result }),
     setAccompanyStyle: (style) => set((s) => { s.accompanyStyle = style }),
+    addChatMessage: (msg) => set((s) => { s.chatMessages.push(msg) }),
+    updateChatMessage: (id, patch) => set((s) => {
+      const msg = s.chatMessages.find((m) => m.id === id)
+      if (msg) Object.assign(msg, patch)
+    }),
+    setChatting: (v) => set((s) => { s.isChatting = v }),
+    setChatError: (err) => set((s) => { s.chatError = err }),
+    clearChat: () => set((s) => { s.chatMessages = []; s.chatError = null }),
     clearResults: () => set((s) => {
       s.analysis = null
       s.suggestions = []

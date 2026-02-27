@@ -49,6 +49,20 @@ interface AccompanyRequest {
   style?: string
 }
 
+interface ChatRequest {
+  message: string
+  context: {
+    notes: NoteData[]
+    bpm: number
+    trackName?: string
+    trackType?: string
+    clipName?: string
+    presetId?: string
+    totalTracks: number
+  }
+  history: Array<{ role: 'user' | 'assistant'; content: string }>
+}
+
 // ─── JSON extraction helper ─────────────────────────────────────────────────
 // Claude sometimes wraps JSON in ```json ... ``` code blocks despite instructions.
 
@@ -229,6 +243,59 @@ GENERAL RULES:
 - Make it sound musical and professional
 - Respect the style hint if provided
 - Each track should have at least 8 notes`
+
+const CHAT_SYSTEM = `You are a music production assistant in a browser-based DAW. Users chat with you to manipulate MIDI tracks and generate new musical content.
+
+You receive the user's current DAW context: selected clip notes, BPM, track info. ALWAYS respond with valid JSON:
+{
+  "message": "Brief explanation of what you did",
+  "actions": [],
+  "generatedNotes": []
+}
+
+## Available Actions (applied to the selected clip)
+
+1. transpose — { "type": "transpose", "semitones": 12 }
+   Positive = up, negative = down. 12 = one octave.
+
+2. quantize — { "type": "quantize", "division": 0.5 }
+   1 = quarter, 0.5 = eighth, 0.25 = sixteenth notes.
+
+3. setVelocity — { "type": "setVelocity", "velocity": 100 }
+
+4. setVelocityRange — { "type": "setVelocityRange", "min": 60, "max": 100 }
+   Randomize velocities for humanization.
+
+5. reverse — { "type": "reverse" }
+
+6. timeStretch — { "type": "timeStretch", "factor": 2.0 }
+   >1 = slower/spread out, <1 = faster/compress.
+
+7. deleteNotes — { "type": "deleteNotes", "filter": { "pitchBelow": 60 } }
+   Filter keys: pitchBelow, pitchAbove, velocityBelow. No filter = delete all.
+
+8. setBpm — { "type": "setBpm", "bpm": 140 }
+
+9. replaceNotes — { "type": "replaceNotes", "notes": [...] }
+   Replace ALL clip notes. Use for rewrites, style changes, transformations.
+
+10. addNotes — { "type": "addNotes", "notes": [...] }
+    Add notes to existing clip content.
+
+11. addTrack — { "type": "addTrack", "trackType": "midi", "name": "Jazz Bass", "presetId": "synth-bass", "notes": [...], "durationBeats": 16 }
+    Valid presetIds: acoustic-kit, synth-bass, fm-bass, warm-pad, saw-lead, classic-piano, electric-piano, guitar, fm-bell, triangle-lead
+
+## Note Format
+{ "pitch": 60, "startBeat": 0, "durationBeats": 1, "velocity": 90 }
+pitch = MIDI number (60=C4, 69=A4). Drums: kick=36, snare=38, hi-hat=42, crash=49.
+
+## Guidelines
+- For simple manipulation (transpose, quantize, velocity, reverse, tempo), use actions ONLY — do NOT regenerate notes
+- For creative requests (rewrite in jazz, generate harmony), use replaceNotes or addTrack with new notes
+- You can combine multiple actions (e.g. transpose + quantize)
+- If no notes in context and user asks to manipulate, tell them to select notes first
+- Keep generated music coherent with input — match key, style, rhythm
+- Be concise — this is a production tool`
 
 // ─── Server setup ────────────────────────────────────────────────────────────
 
@@ -595,6 +662,63 @@ app.post<{ Body: AccompanyRequest }>('/api/ai/accompany', async (request, reply)
     const message = err instanceof Error ? err.message : 'Unknown error'
     request.log.error({ err }, 'Claude API error')
     return reply.status(500).send({ error: 'AI accompaniment failed', message })
+  }
+})
+
+// ── Chat endpoint ───────────────────────────────────────────────────────────
+
+app.post<{ Body: ChatRequest }>('/api/ai/chat', async (request, reply) => {
+  const { message, context, history } = request.body
+
+  if (!message?.trim()) {
+    return reply.status(400).send({ error: 'No message provided' })
+  }
+
+  // Build context description
+  let contextDesc = `Current DAW state:\n- BPM: ${context.bpm}\n- Total tracks: ${context.totalTracks}`
+  if (context.trackName) contextDesc += `\n- Selected track: "${context.trackName}" (${context.trackType ?? 'midi'})`
+  if (context.clipName) contextDesc += `\n- Selected clip: "${context.clipName}"`
+  if (context.presetId) contextDesc += `\n- Instrument: ${context.presetId}`
+
+  if (context.notes?.length) {
+    contextDesc += `\n\n${notesToDescription(context.notes, context.bpm)}`
+  } else {
+    contextDesc += '\n\nNo notes currently selected.'
+  }
+
+  // Build messages with last 10 history turns
+  const messages: Array<{ role: 'user' | 'assistant'; content: string }> = []
+  const recentHistory = (history ?? []).slice(-10)
+  for (const h of recentHistory) {
+    messages.push({ role: h.role, content: h.content })
+  }
+  messages.push({ role: 'user', content: `${contextDesc}\n\nUser request: ${message}` })
+
+  try {
+    const result = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 4096,
+      system: CHAT_SYSTEM,
+      messages,
+    })
+
+    const text = result.content[0]?.type === 'text' ? result.content[0].text : ''
+    const parsed = JSON.parse(extractJSON(text))
+
+    return {
+      message: parsed.message ?? '',
+      actions: parsed.actions ?? [],
+      generatedNotes: parsed.generatedNotes ?? [],
+      metadata: {
+        model: result.model,
+        inputTokens: result.usage.input_tokens,
+        outputTokens: result.usage.output_tokens,
+      },
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    request.log.error({ err }, 'Claude chat error')
+    return reply.status(500).send({ error: 'AI chat failed', message: msg })
   }
 })
 

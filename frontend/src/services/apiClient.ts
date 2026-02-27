@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Project, Track, Note, AnalysisResult, Suggestion, LibraryClip, AudioFileInfo, AccompanyResult } from '@/types'
+import type { Project, Track, Note, AnalysisResult, Suggestion, LibraryClip, AudioFileInfo, AccompanyResult, ChatAction, ChatContext, ChatRole } from '@/types'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -107,6 +107,13 @@ interface AIAccompanyResponse extends AccompanyResult {
   metadata: { model: string; inputTokens: number; outputTokens: number }
 }
 
+interface AIChatResponse {
+  message: string
+  actions?: ChatAction[]
+  generatedNotes?: Omit<Note, 'id'>[]
+  metadata: { model: string; inputTokens: number; outputTokens: number }
+}
+
 export const aiClient = {
   analyze: (notes: Note[], bpm: number, prompt: string, targetInstrument?: string) =>
     api.post<AIAnalyzeResponse>('/api/ai/analyze', { notes, bpm, prompt, targetInstrument }).then((r) => r.data),
@@ -116,4 +123,7 @@ export const aiClient = {
 
   accompany: (notes: Note[], bpm: number, options?: { bars?: number; style?: string }) =>
     api.post<AIAccompanyResponse>('/api/ai/accompany', { notes, bpm, ...options }).then((r) => r.data),
+
+  chat: (message: string, context: ChatContext, history: Array<{ role: ChatRole; content: string }>) =>
+    api.post<AIChatResponse>('/api/ai/chat', { message, context, history }).then((r) => r.data),
 }
