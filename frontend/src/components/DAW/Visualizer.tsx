@@ -2,13 +2,17 @@
  * Visualizer — FFT frequency bars + floating particles behind the Mixer tab.
  * Each bar gets a random color and lights up when its frequency bin is active.
  * CRT scan-line/vignette overlay for retro feel.
+ * Note infographic flashes on screen when MIDI notes are played.
  */
 import { useRef, useEffect } from 'react'
 import { audioEngine } from '@/services/audioEngine'
+import { midiInputService } from '@/services/midiInputService'
+import { midiToNoteName, isBlackKey } from '@/services/midiService'
 
 const FRAME_INTERVAL = 1000 / 30 // ~30fps
 const PARTICLE_COUNT = 50
 const BAR_COUNT = 64
+const NOTE_FADE_MS = 400
 
 // ─── Pre-generate stable random colors for each bar ──────────────────────────
 
@@ -24,6 +28,60 @@ function generateBarColors(): string[] {
     colors.push(PALETTE[Math.floor(Math.random() * PALETTE.length)])
   }
   return colors
+}
+
+function randomPaletteColor(): string {
+  return PALETTE[Math.floor(Math.random() * PALETTE.length)]
+}
+
+function midiToFrequency(midi: number): number {
+  return 440 * Math.pow(2, (midi - 69) / 12)
+}
+
+// ─── Chord detection ─────────────────────────────────────────────────────────
+
+const CHORD_PATTERNS: [number[], string][] = [
+  [[0, 4, 7],     'maj'],
+  [[0, 3, 7],     'min'],
+  [[0, 4, 7, 11], 'maj7'],
+  [[0, 3, 7, 10], 'min7'],
+  [[0, 4, 7, 10], '7'],
+  [[0, 3, 6],     'dim'],
+  [[0, 4, 8],     'aug'],
+  [[0, 5, 7],     'sus4'],
+  [[0, 2, 7],     'sus2'],
+  [[0, 4, 7, 14], 'add9'],
+]
+
+function detectChord(pitches: number[]): string | null {
+  if (pitches.length < 3) return null
+  const sorted = [...pitches].sort((a, b) => a - b)
+  const root = sorted[0]
+  const intervals = sorted.map(p => (p - root) % 12).sort((a, b) => a - b)
+  const unique = [...new Set(intervals)]
+
+  for (const [pattern, suffix] of CHORD_PATTERNS) {
+    if (unique.length === pattern.length && unique.every((v, i) => v === pattern[i])) {
+      const rootName = midiToNoteName(root).replace(/\d+$/, '')
+      return `${rootName}${suffix}`
+    }
+  }
+  return null
+}
+
+// ─── Note tracking types ─────────────────────────────────────────────────────
+
+interface ActiveNote {
+  velocity: number
+  color: string
+  startTime: number
+}
+
+interface FadingNote {
+  pitch: number
+  velocity: number
+  color: string
+  fadeStart: number
 }
 
 // ─── Particle ─────────────────────────────────────────────────────────────────
@@ -50,6 +108,137 @@ function createParticle(w: number, h: number): Particle {
   }
 }
 
+// ─── Draw note infographic ───────────────────────────────────────────────────
+
+function drawNoteOverlay(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  now: number,
+  activeNotes: Map<number, ActiveNote>,
+  fadingNotes: FadingNote[],
+) {
+  // Collect all notes to display with their alpha
+  const displayNotes: { pitch: number; velocity: number; color: string; alpha: number }[] = []
+
+  for (const [pitch, note] of activeNotes) {
+    // Quick ramp-in over 50ms
+    const age = now - note.startTime
+    const rampAlpha = Math.min(1, age / 50)
+    displayNotes.push({ pitch, velocity: note.velocity, color: note.color, alpha: rampAlpha })
+  }
+
+  for (const fn of fadingNotes) {
+    const elapsed = now - fn.fadeStart
+    const alpha = Math.max(0, 1 - elapsed / NOTE_FADE_MS)
+    if (alpha > 0) {
+      displayNotes.push({ pitch: fn.pitch, velocity: fn.velocity, color: fn.color, alpha })
+    }
+  }
+
+  if (displayNotes.length === 0) return
+
+  // Position: center-right area
+  const cx = w * 0.72
+  let cy = h * 0.3
+
+  // Chord detection
+  const activePitches = displayNotes.filter(n => n.alpha > 0.5).map(n => n.pitch)
+  const chord = detectChord(activePitches)
+
+  if (chord) {
+    const maxAlpha = Math.max(...displayNotes.map(n => n.alpha))
+    const chordColor = displayNotes[0].color
+    drawGlowText(ctx, chord, cx, cy - 10, 28, chordColor, maxAlpha * 0.7)
+    cy += 20
+  }
+
+  // Draw each note
+  for (let i = 0; i < displayNotes.length; i++) {
+    const { pitch, velocity, color, alpha } = displayNotes[i]
+    const noteName = midiToNoteName(pitch)
+    const freq = midiToFrequency(pitch).toFixed(1)
+    const black = isBlackKey(pitch)
+    const y = cy + i * 60
+
+    if (y > h - 30) break // don't overflow canvas
+
+    // Note name — big glowing text
+    const fontSize = 36
+    drawGlowText(ctx, noteName, cx, y, fontSize, color, alpha)
+
+    // Sharp/flat indicator styling — slightly different treatment for black keys
+    if (black) {
+      ctx.globalAlpha = alpha * 0.4
+      ctx.fillStyle = color
+      ctx.font = '11px "Share Tech Mono", monospace'
+      ctx.fillText('♯', cx + ctx.measureText(noteName).width / 2 + 22, y - 8)
+    }
+
+    // Frequency readout — smaller, dimmer
+    ctx.globalAlpha = alpha * 0.45
+    ctx.fillStyle = color
+    ctx.font = '13px "Share Tech Mono", monospace'
+    ctx.textAlign = 'center'
+    ctx.fillText(`${freq} Hz`, cx, y + 18)
+
+    // Velocity bar
+    const velNorm = velocity / 127
+    const barW = 60
+    const barH = 3
+    const barX = cx - barW / 2
+    const barY = y + 26
+
+    // Bar background
+    ctx.globalAlpha = alpha * 0.15
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(barX, barY, barW, barH)
+
+    // Bar fill — brightness scales with velocity
+    ctx.globalAlpha = alpha * (0.4 + velNorm * 0.5)
+    ctx.fillStyle = color
+    ctx.fillRect(barX, barY, barW * velNorm, barH)
+
+    ctx.globalAlpha = 1
+  }
+
+  ctx.globalAlpha = 1
+  ctx.textAlign = 'start'
+}
+
+function drawGlowText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  fontSize: number,
+  color: string,
+  alpha: number,
+) {
+  ctx.font = `bold ${fontSize}px "Share Tech Mono", monospace`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+
+  // Shadow/glow pass
+  ctx.save()
+  ctx.shadowColor = color
+  ctx.shadowBlur = 18
+  ctx.globalAlpha = alpha * 0.6
+  ctx.fillStyle = color
+  ctx.fillText(text, x, y)
+  ctx.restore()
+
+  // Sharp pass
+  ctx.globalAlpha = alpha * 0.95
+  ctx.fillStyle = '#ffffff'
+  ctx.font = `bold ${fontSize}px "Share Tech Mono", monospace`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(text, x, y)
+
+  ctx.globalAlpha = 1
+}
+
 // ─── Visualizer Component ─────────────────────────────────────────────────────
 
 export function Visualizer() {
@@ -61,6 +250,38 @@ export function Visualizer() {
   const barColorsRef = useRef<string[]>(generateBarColors())
   const scanLineOffset = useRef(0)
   const timeRef = useRef(0)
+
+  // Note tracking refs (no re-renders)
+  const activeNotesRef = useRef<Map<number, ActiveNote>>(new Map())
+  const fadingNotesRef = useRef<FadingNote[]>([])
+
+  // Subscribe to MIDI note on/off events
+  useEffect(() => {
+    const unsubOn = midiInputService.onNoteOn((evt) => {
+      // Remove from fading if re-struck
+      fadingNotesRef.current = fadingNotesRef.current.filter(f => f.pitch !== evt.pitch)
+      activeNotesRef.current.set(evt.pitch, {
+        velocity: evt.velocity,
+        color: randomPaletteColor(),
+        startTime: performance.now(),
+      })
+    })
+
+    const unsubOff = midiInputService.onNoteOff((evt) => {
+      const note = activeNotesRef.current.get(evt.pitch)
+      if (note) {
+        fadingNotesRef.current.push({
+          pitch: evt.pitch,
+          velocity: note.velocity,
+          color: note.color,
+          fadeStart: performance.now(),
+        })
+        activeNotesRef.current.delete(evt.pitch)
+      }
+    })
+
+    return () => { unsubOn(); unsubOff() }
+  }, [])
 
   // Responsive canvas sizing
   useEffect(() => {
@@ -189,6 +410,16 @@ export function Visualizer() {
 
         ctx.globalAlpha = 1
       }
+
+      // ── Note infographic overlay ────────────────────────────────────
+      const now = performance.now()
+
+      // Prune expired fading notes
+      fadingNotesRef.current = fadingNotesRef.current.filter(
+        f => now - f.fadeStart < NOTE_FADE_MS
+      )
+
+      drawNoteOverlay(ctx, w, h, now, activeNotesRef.current, fadingNotesRef.current)
 
       // ── CRT overlay: scan-lines + vignette ────────────────────────────
       scanLineOffset.current = (scanLineOffset.current + 0.3) % 4
