@@ -45,6 +45,9 @@ make test             # Run all tests
 make up               # docker-compose dev mode
 ```
 
+## Roadmap
+See `ROADMAP.md` for released versions, upcoming features, and backlog items. Reference it at the start of each session to understand current priorities.
+
 ## User Preferences
 - Use feature branches for all new work
 - Git identity: scoady / scoady@users.noreply.github.com
