@@ -2,7 +2,8 @@ import { useCallback, useRef, useEffect } from 'react'
 import {
   Sparkles, Play, Square, Plus, Send,
   Music, Waves, ArrowRight, Loader2,
-  X, Zap, Activity,
+  X, Zap, Activity, Wand2,
+  Volume2, Keyboard, Mic,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useDAWStore, selectClipById } from '@/store/dawStore'
@@ -14,7 +15,7 @@ import { midiToNoteName, isBlackKey } from '@/services/midiService'
 import { Button } from '@/components/common/Button'
 import { LEDIndicator } from '@/components/common/LEDIndicator'
 import { LogoIcon } from '@/components/common/LogoIcon'
-import type { Note, Suggestion } from '@/types'
+import type { Note, Suggestion, AccompanyRole } from '@/types'
 import * as Tone from 'tone'
 
 // ─── Oscilloscope Canvas ────────────────────────────────────────────────────
@@ -524,11 +525,31 @@ function AIThinking() {
 
 // ─── Main AI Panel ──────────────────────────────────────────────────────────
 
+const ACCOMPANY_STYLES = ['Pop', 'Jazz', 'Rock', 'Electronic', 'Lo-fi', 'Classical'] as const
+
+const ROLE_ICONS: Record<AccompanyRole, typeof Music> = {
+  drums: Activity,
+  bass: Volume2,
+  chords: Keyboard,
+  lead: Mic,
+}
+
+const ROLE_COLORS: Record<AccompanyRole, string> = {
+  drums: '#ff6b6b',
+  bass: '#00d4ff',
+  chords: '#6c63ff',
+  lead: '#39ff14',
+}
+
 export function AIPanel() {
   const {
     tracks,
     selectedClipId,
     bpm,
+    addTrack,
+    addClip,
+    addNote,
+    setTrackInstrument,
   } = useDAWStore()
 
   const {
@@ -544,6 +565,12 @@ export function AIPanel() {
     setSuggestions,
     clearResults,
     setTargetPresetId,
+    isAccompanying,
+    setAccompanying,
+    accompanyResult,
+    setAccompanyResult,
+    accompanyStyle,
+    setAccompanyStyle,
   } = useAIStore()
 
   // Track the instrument hint for the current prompt
@@ -601,6 +628,64 @@ export function AIPanel() {
       handleAnalyze()
     }
   }
+
+  const handleAccompany = useCallback(async () => {
+    if (allNotes.length === 0) {
+      setError('Record or select some MIDI notes first')
+      return
+    }
+
+    setAccompanying(true)
+    setError(null)
+    setAccompanyResult(null)
+
+    try {
+      const result = await aiClient.accompany(
+        allNotes.map((n) => ({
+          id: n.id,
+          pitch: n.pitch,
+          startBeat: n.startBeat,
+          durationBeats: n.durationBeats,
+          velocity: n.velocity,
+        })),
+        bpm,
+        { bars: 4, style: accompanyStyle },
+      )
+      setAccompanyResult(result)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to generate accompaniment'
+      setError(msg)
+    } finally {
+      setAccompanying(false)
+    }
+  }, [allNotes, bpm, accompanyStyle, setAccompanying, setError, setAccompanyResult])
+
+  const handleAddAccompanyTracks = useCallback(() => {
+    if (!accompanyResult) return
+
+    const roleOrder: AccompanyRole[] = ['drums', 'bass', 'chords', 'lead']
+    const sorted = [...accompanyResult.tracks].sort(
+      (a, b) => roleOrder.indexOf(a.role) - roleOrder.indexOf(b.role)
+    )
+
+    for (const at of sorted) {
+      try {
+        const track = addTrack('midi', at.name)
+        setTrackInstrument(track.id, at.presetId)
+        const clip = addClip(track.id, 0, at.durationBeats)
+        for (const note of at.notes) {
+          addNote(clip.id, {
+            pitch: note.pitch,
+            startBeat: note.startBeat,
+            durationBeats: note.durationBeats,
+            velocity: note.velocity,
+          })
+        }
+      } catch {
+        // Continue with other tracks if one fails
+      }
+    }
+  }, [accompanyResult, addTrack, addClip, addNote, setTrackInstrument])
 
   return (
     <div
@@ -746,6 +831,144 @@ export function AIPanel() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* ── Auto-Accompany Section ───────────────────────────────── */}
+        <div className="p-4 space-y-3 border-b border-border-subtle/50">
+          <div className="flex items-center gap-2">
+            <LEDIndicator on={isAccompanying} color="amber" size="xs" pulse={isAccompanying} />
+            <Wand2 size={10} className="text-amber-400" />
+            <span className="text-[9px] text-text-muted uppercase tracking-[0.12em] font-medium">
+              Auto-Accompany
+            </span>
+          </div>
+
+          {/* Style selector */}
+          <div className="flex flex-wrap gap-1.5">
+            {ACCOMPANY_STYLES.map((style) => (
+              <button
+                key={style}
+                onClick={() => setAccompanyStyle(style.toLowerCase())}
+                className={clsx(
+                  'text-[9px] px-2.5 py-1 rounded font-medium transition-all',
+                  accompanyStyle === style.toLowerCase()
+                    ? 'text-amber-300 border-amber-400/40'
+                    : 'text-text-muted hover:text-text-secondary'
+                )}
+                style={{
+                  background: accompanyStyle === style.toLowerCase()
+                    ? 'rgba(255, 159, 28, 0.12)'
+                    : 'rgba(108, 99, 255, 0.04)',
+                  border: `1px solid ${accompanyStyle === style.toLowerCase() ? 'rgba(255, 159, 28, 0.3)' : 'rgba(45, 51, 72, 0.3)'}`,
+                  boxShadow: accompanyStyle === style.toLowerCase()
+                    ? '0 0 8px rgba(255, 159, 28, 0.1)'
+                    : 'none',
+                }}
+              >
+                {style}
+              </button>
+            ))}
+          </div>
+
+          {/* Generate button */}
+          <button
+            onClick={handleAccompany}
+            disabled={isAccompanying || allNotes.length === 0}
+            className={clsx(
+              'w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-xs font-medium transition-all',
+              isAccompanying || allNotes.length === 0
+                ? 'text-text-muted cursor-not-allowed'
+                : 'text-amber-200 hover:text-amber-100 cursor-pointer'
+            )}
+            style={{
+              background: isAccompanying || allNotes.length === 0
+                ? 'rgba(45, 51, 72, 0.2)'
+                : 'linear-gradient(180deg, rgba(255, 159, 28, 0.15) 0%, rgba(255, 159, 28, 0.08) 100%)',
+              border: `1px solid ${isAccompanying || allNotes.length === 0 ? 'rgba(45, 51, 72, 0.3)' : 'rgba(255, 159, 28, 0.25)'}`,
+              boxShadow: isAccompanying || allNotes.length === 0
+                ? 'none'
+                : '0 0 12px rgba(255, 159, 28, 0.08)',
+            }}
+          >
+            {isAccompanying ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <Sparkles size={12} />
+            )}
+            {isAccompanying ? 'Composing arrangement...' : 'Generate Accompaniment'}
+          </button>
+
+          {/* Accompaniment thinking state */}
+          {isAccompanying && <AIThinking />}
+
+          {/* Accompaniment result */}
+          {accompanyResult && !isAccompanying && (
+            <div className="space-y-2">
+              {/* Analysis card */}
+              <div
+                className="rounded-md px-3 py-2"
+                style={{
+                  background: 'linear-gradient(180deg, #0e1018 0%, #0a0c14 100%)',
+                  border: '1px solid rgba(255, 159, 28, 0.2)',
+                  borderLeft: '3px solid rgba(255, 159, 28, 0.5)',
+                }}
+              >
+                <div className="flex items-center gap-3 mb-1">
+                  <span className="text-[9px] text-text-muted uppercase">Key</span>
+                  <span className="text-xs font-bold font-mono text-amber-300"
+                    style={{ textShadow: '0 0 6px rgba(255, 159, 28, 0.4)' }}
+                  >
+                    {accompanyResult.analysis.key} {accompanyResult.analysis.scale}
+                  </span>
+                  <span className="text-[9px] text-text-muted uppercase">Time</span>
+                  <span className="text-xs font-mono text-amber-300">
+                    {accompanyResult.analysis.timeSignature}
+                  </span>
+                </div>
+                <p className="text-2xs text-text-secondary">{accompanyResult.analysis.feel}</p>
+              </div>
+
+              {/* Track list */}
+              {accompanyResult.tracks.map((at, i) => {
+                const RoleIcon = ROLE_ICONS[at.role] ?? Music
+                const roleColor = ROLE_COLORS[at.role] ?? '#6c63ff'
+                return (
+                  <div
+                    key={i}
+                    className="flex items-center gap-2 px-3 py-2 rounded-md"
+                    style={{
+                      background: 'linear-gradient(180deg, #0e1018 0%, #0a0c14 100%)',
+                      border: '1px solid rgba(45, 51, 72, 0.4)',
+                      borderLeft: `3px solid ${roleColor}60`,
+                    }}
+                  >
+                    <RoleIcon size={12} style={{ color: roleColor }} />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-xs font-medium text-text-primary block truncate">{at.name}</span>
+                      <span className="text-[9px] text-text-muted">{at.presetId}</span>
+                    </div>
+                    <span className="text-[9px] font-mono text-text-muted">
+                      <span style={{ color: roleColor }}>{at.notes.length}</span> notes
+                    </span>
+                  </div>
+                )
+              })}
+
+              {/* Add all tracks button */}
+              <button
+                onClick={handleAddAccompanyTracks}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-xs font-medium text-amber-200 hover:text-amber-100 transition-all cursor-pointer"
+                style={{
+                  background: 'linear-gradient(180deg, rgba(255, 159, 28, 0.12) 0%, rgba(255, 159, 28, 0.06) 100%)',
+                  border: '1px solid rgba(255, 159, 28, 0.2)',
+                  boxShadow: '0 0 12px rgba(255, 159, 28, 0.06)',
+                }}
+              >
+                <Plus size={12} />
+                Add All Tracks to Project
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Loading State */}

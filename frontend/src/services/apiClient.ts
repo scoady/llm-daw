@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Project, Track, Note, AnalysisResult, Suggestion, LibraryClip, AudioFileInfo } from '@/types'
+import type { Project, Track, Note, AnalysisResult, Suggestion, LibraryClip, AudioFileInfo, AccompanyResult } from '@/types'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -103,10 +103,17 @@ interface AIGenerateResponse {
   metadata: { model: string }
 }
 
+interface AIAccompanyResponse extends AccompanyResult {
+  metadata: { model: string; inputTokens: number; outputTokens: number }
+}
+
 export const aiClient = {
   analyze: (notes: Note[], bpm: number, prompt: string, targetInstrument?: string) =>
     api.post<AIAnalyzeResponse>('/api/ai/analyze', { notes, bpm, prompt, targetInstrument }).then((r) => r.data),
 
   generate: (seedNotes: Note[], bpm: number, type: string, bars: number, options?: { key?: string; scale?: string; style?: string }) =>
     api.post<AIGenerateResponse>('/api/ai/generate', { seedNotes, bpm, type, bars, ...options }).then((r) => r.data),
+
+  accompany: (notes: Note[], bpm: number, options?: { bars?: number; style?: string }) =>
+    api.post<AIAccompanyResponse>('/api/ai/accompany', { notes, bpm, ...options }).then((r) => r.data),
 }

@@ -187,3 +187,25 @@ export interface Suggestion {
   notes: Note[]
   durationBeats: number
 }
+
+// ─── AI Accompaniment ────────────────────────────────────────────────────────
+
+export type AccompanyRole = 'drums' | 'bass' | 'chords' | 'lead'
+
+export interface AccompanyTrack {
+  role: AccompanyRole
+  name: string
+  presetId: string
+  notes: Omit<Note, 'id'>[]
+  durationBeats: number
+}
+
+export interface AccompanyResult {
+  analysis: {
+    key: string
+    scale: string
+    timeSignature: string
+    feel: string
+  }
+  tracks: AccompanyTrack[]
+}

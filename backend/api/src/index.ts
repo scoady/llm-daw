@@ -42,6 +42,13 @@ interface GenerateRequest {
   style?: string
 }
 
+interface AccompanyRequest {
+  notes: NoteData[]
+  bpm: number
+  bars?: number
+  style?: string
+}
+
 // ─── JSON extraction helper ─────────────────────────────────────────────────
 // Claude sometimes wraps JSON in ```json ... ``` code blocks despite instructions.
 
@@ -149,6 +156,63 @@ Rules:
 - velocity: 0-127
 - Stay in key with the seed notes
 - Generate musically interesting, playable parts`
+
+const ACCOMPANY_SYSTEM = `You are an expert music arranger integrated into a browser-based DAW. Given a melody or musical idea (as MIDI notes), you generate a full multi-track accompaniment arrangement.
+
+ALWAYS respond with valid JSON in this exact format:
+{
+  "analysis": {
+    "key": "C",
+    "scale": "minor",
+    "timeSignature": "4/4",
+    "feel": "A moody, driving groove with syncopated rhythms"
+  },
+  "tracks": [
+    {
+      "role": "drums",
+      "name": "Drums",
+      "presetId": "acoustic-kit",
+      "durationBeats": 16,
+      "notes": [
+        { "pitch": 36, "startBeat": 0, "durationBeats": 0.5, "velocity": 100 }
+      ]
+    }
+  ]
+}
+
+INSTRUMENT RULES — you MUST follow these exactly:
+
+1. DRUMS (role: "drums", presetId: "acoustic-kit"):
+   - Use GM drum mapping: kick=36, snare=38, closed hi-hat=42, open hi-hat=46, crash=49, ride=51, low tom=45, mid tom=47, high tom=50
+   - Create groove patterns with kick/snare/hat foundations
+   - Vary velocity for human feel (ghost notes at 40-60, accents at 100-120)
+
+2. BASS (role: "bass", presetId: "synth-bass"):
+   - MIDI range: 28-55 (E1 to G3)
+   - Follow root notes of the harmony
+   - Use rhythmic patterns that lock with the drums
+   - Velocity range: 70-110
+
+3. CHORDS (role: "chords", presetId: "warm-pad"):
+   - MIDI range: 48-72 (C3 to C5)
+   - Use sustained voicings (durationBeats: 2-4)
+   - Keep voicings close (no wide jumps)
+   - Velocity range: 50-80 (pads should sit back in the mix)
+
+4. LEAD (role: "lead", presetId: "saw-lead"):
+   - MIDI range: 60-84 (C4 to C6)
+   - Create a counter-melody that complements (not duplicates) the input
+   - Use a mix of short and long notes
+   - Velocity range: 70-100
+
+GENERAL RULES:
+- Generate 3-4 tracks (drums + bass + chords, optionally lead)
+- All tracks must be the same durationBeats
+- startBeat is relative to clip start (begins at 0)
+- Stay in the detected key and scale
+- Make it sound musical and professional
+- Respect the style hint if provided
+- Each track should have at least 8 notes`
 
 // ─── Server setup ────────────────────────────────────────────────────────────
 
@@ -447,6 +511,74 @@ app.post<{ Body: GenerateRequest }>('/api/ai/generate', async (request, reply) =
     const message = err instanceof Error ? err.message : 'Unknown error'
     request.log.error({ err }, 'Claude API error')
     return reply.status(500).send({ error: 'AI generation failed', message })
+  }
+})
+
+// ── Accompany endpoint ──────────────────────────────────────────────────────
+
+app.post<{ Body: AccompanyRequest }>('/api/ai/accompany', async (request, reply) => {
+  const { notes, bpm, bars = 4, style } = request.body
+
+  if (!notes?.length) {
+    return reply.status(400).send({ error: 'No notes provided' })
+  }
+
+  const description = notesToDescription(notes, bpm)
+  const styleHint = style ? `\n\nStyle: ${style}. Tailor the groove, rhythm, and voicings to this genre.` : ''
+
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 8192,
+      system: ACCOMPANY_SYSTEM,
+      messages: [
+        {
+          role: 'user',
+          content: `Here is my melody/idea:\n\n${description}\n\nGenerate a full ${bars}-bar accompaniment arrangement (${bars * 4} beats total).${styleHint}`,
+        },
+      ],
+    })
+
+    const text = message.content[0]?.type === 'text' ? message.content[0].text : ''
+    const result = JSON.parse(extractJSON(text))
+
+    // Validate presetIds against known set
+    const VALID_PRESETS = new Set([
+      'acoustic-kit', 'kick', 'tom', 'hi-hat', 'snare',
+      'sub-bass', 'synth-bass', 'fm-bass', 'acid-bass', 'pluck-bass',
+      'warm-pad', 'string-pad', 'glass-pad', 'am-pad', 'choir-pad',
+      'saw-lead', 'triangle-lead', 'square-lead', 'pulse-lead', 'detuned-saw',
+      'classic-piano', 'electric-piano', 'organ', 'clavinet', 'harpsichord',
+      'guitar', 'harp', 'bell-pluck', 'sitar',
+      'fm-bell', 'music-box', 'vibraphone', 'chime',
+      'noise-burst', 'fm-experiment', 'duo-voice',
+    ])
+
+    const ROLE_FALLBACKS: Record<string, string> = {
+      drums: 'acoustic-kit',
+      bass: 'synth-bass',
+      chords: 'warm-pad',
+      lead: 'triangle-lead',
+    }
+
+    for (const track of result.tracks ?? []) {
+      if (!VALID_PRESETS.has(track.presetId)) {
+        track.presetId = ROLE_FALLBACKS[track.role] ?? 'triangle-lead'
+      }
+    }
+
+    return {
+      ...result,
+      metadata: {
+        model: message.model,
+        inputTokens: message.usage.input_tokens,
+        outputTokens: message.usage.output_tokens,
+      },
+    }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    request.log.error({ err }, 'Claude API error')
+    return reply.status(500).send({ error: 'AI accompaniment failed', message })
   }
 })
 
