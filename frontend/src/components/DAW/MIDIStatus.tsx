@@ -105,7 +105,7 @@ export function MIDIStatus() {
       {/* Dropdown */}
       {dropdownOpen && (
         <div className="absolute top-full left-0 mt-1 w-64 rounded-lg shadow-panel-raised z-50 overflow-hidden"
-          style={{ background: 'linear-gradient(180deg, #111420 0%, #0f1114 100%)', border: '1px solid #2d3348' }}
+          style={{ background: 'linear-gradient(180deg, #1c2030 0%, #1a1d28 100%)', border: '1px solid #363c52' }}
         >
           <div className="px-3 py-2 border-b border-border-subtle">
             <span className="text-2xs text-text-muted uppercase tracking-[0.15em] font-lcd font-medium">

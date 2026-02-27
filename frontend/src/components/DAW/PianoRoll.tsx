@@ -70,10 +70,10 @@ function PianoKeys({
           background: isActive
             ? '#6c63ff'
             : black
-              ? 'linear-gradient(180deg, #2a2a30 0%, #0a0a0f 100%)'
+              ? 'linear-gradient(180deg, #34343a 0%, #1a1a22 100%)'
               : 'linear-gradient(180deg, #f0f0f0 0%, #d8d8d8 100%)',
-          borderBottom: '1px solid #1f2233',
-          borderRight: '1px solid #1f2233',
+          borderBottom: '1px solid #2a2e40',
+          borderRight: '1px solid #2a2e40',
           cursor: 'pointer',
           zIndex: black ? 2 : 1,
           display: 'flex',
@@ -151,8 +151,8 @@ function NoteGrid({
 
     // Ruler gradient
     const rulerGrad = ctx.createLinearGradient(0, 0, 0, HEADER_H)
-    rulerGrad.addColorStop(0, '#12151e')
-    rulerGrad.addColorStop(1, '#0d1018')
+    rulerGrad.addColorStop(0, '#1e2230')
+    rulerGrad.addColorStop(1, '#191c28')
     ctx.fillStyle = rulerGrad
     ctx.fillRect(0, 0, w, HEADER_H)
 
@@ -355,7 +355,7 @@ function VelocityLane({
     ctx.clearRect(0, 0, size.w, size.h)
 
     // Background
-    ctx.fillStyle = '#0a0c12'
+    ctx.fillStyle = '#161922'
     ctx.fillRect(0, 0, size.w, size.h)
 
     // Grid lines at velocity levels

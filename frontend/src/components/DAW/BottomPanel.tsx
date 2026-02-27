@@ -29,7 +29,7 @@ export function BottomPanel() {
       <div
         className="flex items-center h-[28px] flex-shrink-0 select-none relative"
         style={{
-          background: 'linear-gradient(180deg, #14171f 0%, #0d1018 100%)',
+          background: 'linear-gradient(180deg, #1e2130 0%, #191c28 100%)',
           borderBottom: '1px solid rgba(45, 51, 72, 0.3)',
         }}
       >

@@ -15,7 +15,7 @@ import { getPreset, DEFAULT_PRESET_ID } from '@/data/instrumentPresets'
 import { midiToNoteName, isBlackKey } from '@/services/midiService'
 import { Button } from '@/components/common/Button'
 import { LEDIndicator } from '@/components/common/LEDIndicator'
-import { LogoIcon } from '@/components/common/LogoIcon'
+import { AISparkleIcon } from '@/components/common/AISparkleIcon'
 import type { Note, Suggestion, AccompanyRole, ChatMessage, ChatContext } from '@/types'
 import * as Tone from 'tone'
 
@@ -124,7 +124,7 @@ function Oscilloscope({ active }: { active: boolean }) {
     <div className="relative overflow-hidden rounded-md" style={{ height: 60 }}>
       <div
         className="absolute inset-0"
-        style={{ background: 'linear-gradient(180deg, #0a0c14 0%, #080a10 100%)' }}
+        style={{ background: 'linear-gradient(180deg, #161922 0%, #141820 100%)' }}
       />
       <canvas
         ref={canvasRef}
@@ -201,7 +201,7 @@ function MiniNotePreview({ notes, height = 48 }: { notes: Note[]; height?: numbe
     return (
       <div
         className="flex items-center justify-center text-2xs text-text-muted rounded-md border border-border-subtle"
-        style={{ height, background: 'linear-gradient(180deg, #0a0c14 0%, #080a10 100%)' }}
+        style={{ height, background: 'linear-gradient(180deg, #161922 0%, #141820 100%)' }}
       >
         No notes selected
       </div>
@@ -212,7 +212,7 @@ function MiniNotePreview({ notes, height = 48 }: { notes: Note[]; height?: numbe
     <canvas
       ref={canvasRef}
       className="w-full rounded-md border border-border-subtle"
-      style={{ height, background: 'linear-gradient(180deg, #0a0c14 0%, #080a10 100%)' }}
+      style={{ height, background: 'linear-gradient(180deg, #161922 0%, #141820 100%)' }}
     />
   )
 }
@@ -313,7 +313,7 @@ function SuggestionCard({ suggestion, index }: { suggestion: Suggestion; index: 
     >
       <div
         className="rounded-lg overflow-hidden"
-        style={{ background: 'linear-gradient(180deg, #141824 0%, #0f1218 100%)' }}
+        style={{ background: 'linear-gradient(180deg, #1e2230 0%, #1a1d28 100%)' }}
       >
         {/* Glowing left border accent */}
         <div className="flex">
@@ -505,7 +505,7 @@ function AIThinking() {
       <div className="relative w-full overflow-hidden rounded-md" style={{ height: 80 }}>
         <div
           className="absolute inset-0"
-          style={{ background: 'linear-gradient(180deg, #0a0c14 0%, #080a10 100%)' }}
+          style={{ background: 'linear-gradient(180deg, #161922 0%, #141820 100%)' }}
         />
         <canvas
           ref={canvasRef}
@@ -558,7 +558,7 @@ function ChatBubble({ message }: { message: ChatMessage }) {
         style={{
           background: isUser
             ? 'linear-gradient(180deg, rgba(108, 99, 255, 0.15) 0%, rgba(108, 99, 255, 0.08) 100%)'
-            : 'linear-gradient(180deg, #141824 0%, #0f1218 100%)',
+            : 'linear-gradient(180deg, #1e2230 0%, #1a1d28 100%)',
           border: isUser
             ? '1px solid rgba(108, 99, 255, 0.25)'
             : message.error
@@ -770,7 +770,7 @@ function ChatView() {
                        placeholder:text-text-muted/50 resize-none
                        focus:outline-none transition-all"
             style={{
-              background: 'linear-gradient(180deg, #0a0c14 0%, #080a10 100%)',
+              background: 'linear-gradient(180deg, #161922 0%, #141820 100%)',
               border: '1px solid rgba(45, 51, 72, 0.5)',
               boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)',
             }}
@@ -973,15 +973,15 @@ export function AIPanel() {
   return (
     <div
       className="flex flex-col h-full w-[380px] ai-panel scan-line-overlay noise-texture"
-      style={{ background: 'linear-gradient(180deg, #0e1018 0%, #0a0c12 50%, #080a0e 100%)' }}
+      style={{ background: 'linear-gradient(180deg, #1a1e2a 0%, #171a24 50%, #141820 100%)' }}
     >
       {/* Header */}
       <div
         className="flex items-center gap-2 px-4 py-2.5 border-b border-border-subtle"
-        style={{ background: 'linear-gradient(180deg, #12151e 0%, #0d1018 100%)' }}
+        style={{ background: 'linear-gradient(180deg, #1e2230 0%, #191c28 100%)' }}
       >
         <LEDIndicator on color="accent" size="xs" pulse />
-        <LogoIcon size={16} color="#6c63ff" glow glowColor="rgba(108,99,255,0.5)" />
+        <AISparkleIcon size={18} color="#6c63ff" />
         <h2 className="text-xs font-semibold text-accent uppercase tracking-[0.12em] flex-1"
           style={{ textShadow: '0 0 8px rgba(108,99,255,0.4)' }}
         >
@@ -998,7 +998,7 @@ export function AIPanel() {
       {/* Tab bar */}
       <div
         className="flex border-b border-border-subtle/50"
-        style={{ background: 'linear-gradient(180deg, #0e1018 0%, #0c0e16 100%)' }}
+        style={{ background: 'linear-gradient(180deg, #1a1e2a 0%, #181b24 100%)' }}
       >
         {(['assist', 'chat'] as const).map((tab) => (
           <button
@@ -1078,7 +1078,7 @@ export function AIPanel() {
                          placeholder:text-text-muted/50 resize-none
                          focus:outline-none transition-all"
               style={{
-                background: 'linear-gradient(180deg, #0a0c14 0%, #080a10 100%)',
+                background: 'linear-gradient(180deg, #161922 0%, #141820 100%)',
                 border: '1px solid rgba(45, 51, 72, 0.5)',
                 boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)',
               }}
@@ -1219,7 +1219,7 @@ export function AIPanel() {
               <div
                 className="rounded-md px-3 py-2"
                 style={{
-                  background: 'linear-gradient(180deg, #0e1018 0%, #0a0c14 100%)',
+                  background: 'linear-gradient(180deg, #1a1e2a 0%, #161922 100%)',
                   border: '1px solid rgba(255, 159, 28, 0.2)',
                   borderLeft: '3px solid rgba(255, 159, 28, 0.5)',
                 }}
@@ -1248,7 +1248,7 @@ export function AIPanel() {
                     key={i}
                     className="flex items-center gap-2 px-3 py-2 rounded-md"
                     style={{
-                      background: 'linear-gradient(180deg, #0e1018 0%, #0a0c14 100%)',
+                      background: 'linear-gradient(180deg, #1a1e2a 0%, #161922 100%)',
                       border: '1px solid rgba(45, 51, 72, 0.4)',
                       borderLeft: `3px solid ${roleColor}60`,
                     }}
@@ -1318,7 +1318,7 @@ export function AIPanel() {
               <div
                 className="rounded-md px-3 py-2"
                 style={{
-                  background: 'linear-gradient(180deg, #0e1018 0%, #0a0c14 100%)',
+                  background: 'linear-gradient(180deg, #1a1e2a 0%, #161922 100%)',
                   border: '1px solid rgba(45, 51, 72, 0.4)',
                   borderLeft: '3px solid rgba(0, 212, 255, 0.6)',
                   boxShadow: 'inset 0 0 12px rgba(0, 212, 255, 0.03)',
@@ -1334,7 +1334,7 @@ export function AIPanel() {
               <div
                 className="rounded-md px-3 py-2"
                 style={{
-                  background: 'linear-gradient(180deg, #0e1018 0%, #0a0c14 100%)',
+                  background: 'linear-gradient(180deg, #1a1e2a 0%, #161922 100%)',
                   border: '1px solid rgba(45, 51, 72, 0.4)',
                   borderLeft: '3px solid rgba(108, 99, 255, 0.6)',
                   boxShadow: 'inset 0 0 12px rgba(108, 99, 255, 0.03)',
@@ -1387,7 +1387,7 @@ export function AIPanel() {
                 boxShadow: '0 0 20px rgba(108, 99, 255, 0.08)',
               }}
             >
-              <LogoIcon size={28} color="#6c63ff" glow />
+              <AISparkleIcon size={32} color="#6c63ff" />
             </div>
             <h3
               className="text-sm font-semibold text-accent mb-2 uppercase tracking-wide"

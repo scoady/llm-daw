@@ -53,8 +53,8 @@ function SpectrumAnalyzer({ eqLow, eqMid, eqHigh }: { eqLow: number; eqMid: numb
 
       // Clear with dark gradient
       const bgGrad = ctx.createLinearGradient(0, 0, 0, h)
-      bgGrad.addColorStop(0, '#08090e')
-      bgGrad.addColorStop(1, '#0c0e16')
+      bgGrad.addColorStop(0, '#141620')
+      bgGrad.addColorStop(1, '#181b24')
       ctx.fillStyle = bgGrad
       ctx.fillRect(0, 0, w, h)
 
@@ -383,7 +383,7 @@ function MasterOutput() {
       className="flex flex-col items-center gap-1.5 px-3 py-2 border-l border-border-subtle/30 flex-shrink-0"
       style={{
         width: 100,
-        background: 'linear-gradient(180deg, #0d1018 0%, #08090e 100%)',
+        background: 'linear-gradient(180deg, #191c28 0%, #141620 100%)',
       }}
     >
       {/* Label */}
@@ -435,7 +435,7 @@ export function MasterEQ() {
   const { masterEQ } = useDAWStore()
 
   return (
-    <div className="flex flex-col h-full" style={{ background: '#0a0c12' }}>
+    <div className="flex flex-col h-full" style={{ background: '#161922' }}>
       {/* Main content: Spectrum + Master Output */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Spectrum analyzer + EQ controls */}

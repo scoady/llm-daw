@@ -18,7 +18,7 @@ export function BrowserTabBar({ activeTab, onTabChange }: BrowserTabBarProps) {
   return (
     <div
       className="flex items-center gap-1 px-2 py-1.5 border-b border-border-subtle/50"
-      style={{ background: 'linear-gradient(180deg, #0f1218 0%, #0c0e14 100%)' }}
+      style={{ background: 'linear-gradient(180deg, #1a1d28 0%, #181b24 100%)' }}
     >
       {TABS.map((tab) => {
         const active = activeTab === tab.id

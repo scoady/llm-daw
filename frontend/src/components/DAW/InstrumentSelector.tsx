@@ -84,8 +84,8 @@ export function InstrumentSelector({ trackId, presetId }: InstrumentSelectorProp
         <div
           className="fixed z-[100] rounded-lg shadow-panel-raised overflow-hidden"
           style={{
-            background: 'linear-gradient(180deg, #111420 0%, #0f1114 100%)',
-            border: '1px solid #2d3348',
+            background: 'linear-gradient(180deg, #1c2030 0%, #1a1d28 100%)',
+            border: '1px solid #363c52',
             width: 320,
             maxHeight: 420,
             left: containerRef.current

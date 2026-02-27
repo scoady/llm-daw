@@ -6,17 +6,17 @@ export default {
       colors: {
         // ── Surface system (cool blue undertone) ──────────────────────────
         surface: {
-          0: '#08090b',   // app background — deepest black
-          1: '#0f1114',   // panel backgrounds
-          2: '#161921',   // track rows, inputs
-          3: '#1e2130',   // elevated surfaces, hover
-          4: '#272b3a',   // strong hover, active
-          5: '#313648',   // highest elevation
+          0: '#141620',   // app background — dark gray
+          1: '#1a1d28',   // panel backgrounds
+          2: '#21252f',   // track rows, inputs
+          3: '#282c3a',   // elevated surfaces, hover
+          4: '#313648',   // strong hover, active
+          5: '#3a4058',   // highest elevation
         },
         border: {
-          subtle: '#1f2233',
-          default: '#2d3348',
-          strong: '#3d4460',
+          subtle: '#2a2e40',
+          default: '#363c52',
+          strong: '#4a5168',
           glow: 'rgba(108,99,255,0.3)',
         },
 
@@ -48,7 +48,7 @@ export default {
 
         // ── LED indicator colors ──────────────────────────────────────────
         led: {
-          off: '#1a1d2a',
+          off: '#252838',
           green: '#00ff41',
           yellow: '#ffff00',
           red: '#ff0040',

@@ -106,7 +106,7 @@ function RangeMinimap({ baseNote }: { baseNote: number }) {
       <span className="text-[8px] font-lcd tracking-[0.15em] text-text-muted/50 uppercase">Range</span>
       <div
         className="w-[80px] h-[8px] rounded-full relative overflow-hidden"
-        style={{ background: '#0a0d14', border: '1px solid rgba(45,51,72,0.3)' }}
+        style={{ background: '#161922', border: '1px solid rgba(45,51,72,0.3)' }}
       >
         {/* Tiny key indicators */}
         {Array.from({ length: 88 }, (_, i) => (

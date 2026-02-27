@@ -18,13 +18,13 @@ export function TrackPanel() {
       className="flex flex-col border-r border-border-subtle select-none noise-texture"
       style={{
         width: 220,
-        background: 'linear-gradient(180deg, #111420 0%, #0f1114 100%)',
+        background: 'linear-gradient(180deg, #1c2030 0%, #1a1d28 100%)',
       }}
     >
       {/* Header */}
       <div
         className="flex items-center justify-between px-3 py-2 border-b border-border-subtle h-[32px]"
-        style={{ background: 'linear-gradient(180deg, #12151e 0%, #0d1018 100%)' }}
+        style={{ background: 'linear-gradient(180deg, #1e2230 0%, #191c28 100%)' }}
       >
         <div className="flex items-center gap-2">
           <LEDIndicator on={tracks.length > 0} color="cyan" size="xs" />

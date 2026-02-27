@@ -13,14 +13,14 @@ export function BrowserSidebar() {
     <div
       className="flex flex-col h-full w-[280px] min-w-[280px] select-none"
       style={{
-        background: 'linear-gradient(180deg, #0d1018 0%, #0a0c12 100%)',
+        background: 'linear-gradient(180deg, #191c28 0%, #161922 100%)',
       }}
     >
       {/* Header */}
       <div
         className="flex items-center justify-between px-3 py-2 border-b border-border-subtle/50"
         style={{
-          background: 'linear-gradient(180deg, #111520 0%, #0d1018 100%)',
+          background: 'linear-gradient(180deg, #1c2030 0%, #191c28 100%)',
         }}
       >
         <div className="flex items-center gap-2">

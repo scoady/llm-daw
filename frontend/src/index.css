@@ -64,8 +64,8 @@
 
   /* ── Panel base ──────────────────────────────────────────────────────────── */
   .daw-panel {
-    background: linear-gradient(180deg, #111420 0%, #0f1114 100%);
-    border: 1px solid #1f2233;
+    background: linear-gradient(180deg, #1c2030 0%, #1a1d28 100%);
+    border: 1px solid #2a2e40;
     border-radius: 4px;
     box-shadow:
       0 0 0 1px rgba(255, 255, 255, 0.02),
@@ -74,8 +74,8 @@
   }
 
   .daw-panel-inset {
-    background: linear-gradient(180deg, #0a0c12 0%, #0d0f16 100%);
-    border: 1px solid rgba(0, 0, 0, 0.3);
+    background: linear-gradient(180deg, #161922 0%, #191c26 100%);
+    border: 1px solid rgba(0, 0, 0, 0.25);
     border-radius: 3px;
     box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.02);
   }
@@ -83,20 +83,20 @@
   /* ── Track row ───────────────────────────────────────────────────────────── */
   .track-row {
     @apply border-b transition-colors;
-    border-color: #1f2233;
+    border-color: #2a2e40;
     height: 64px;
   }
 
   .track-row:nth-child(odd) {
-    background: #141824;
+    background: #1e2230;
   }
 
   .track-row:nth-child(even) {
-    background: #12161e;
+    background: #1c2028;
   }
 
   .track-row:hover {
-    background: #1a1e2e;
+    background: #252a38;
   }
 
   .track-row-armed {
@@ -111,8 +111,8 @@
   /* ── Transport buttons ───────────────────────────────────────────────────── */
   .transport-btn {
     @apply flex items-center justify-center w-8 h-8 rounded-md cursor-pointer select-none;
-    background: linear-gradient(180deg, #1e2130 0%, #161921 100%);
-    border: 1px solid rgba(255, 255, 255, 0.04);
+    background: linear-gradient(180deg, #282c3a 0%, #21252f 100%);
+    border: 1px solid rgba(255, 255, 255, 0.05);
     color: #8890a8;
     box-shadow:
       0 1px 3px rgba(0, 0, 0, 0.3),
@@ -121,7 +121,7 @@
   }
 
   .transport-btn:hover {
-    background: linear-gradient(180deg, #272b3a 0%, #1e2130 100%);
+    background: linear-gradient(180deg, #313648 0%, #282c3a 100%);
     color: #e4e6f0;
     border-color: rgba(255, 255, 255, 0.06);
   }
@@ -129,7 +129,7 @@
   .transport-btn:active {
     transform: scale(0.95);
     box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
-    background: linear-gradient(180deg, #141820 0%, #0f1118 100%);
+    background: linear-gradient(180deg, #1e2230 0%, #1a1d28 100%);
   }
 
   .transport-btn.active {
@@ -161,8 +161,8 @@
 
   /* ── Transport bar ───────────────────────────────────────────────────────── */
   .transport-bar {
-    background: linear-gradient(180deg, #12151e 0%, #0d1018 50%, #0f1114 100%);
-    border-bottom: 1px solid #1f2233;
+    background: linear-gradient(180deg, #1e2230 0%, #191c28 50%, #1a1d28 100%);
+    border-bottom: 1px solid #2a2e40;
     position: relative;
   }
 
@@ -184,7 +184,7 @@
 
   /* ── Button group (recessed panel for transport controls) ────────────────── */
   .btn-group {
-    background: linear-gradient(180deg, #0a0c12 0%, #0d0f16 100%);
+    background: linear-gradient(180deg, #161922 0%, #191c26 100%);
     border: 1px solid rgba(0, 0, 0, 0.3);
     border-radius: 6px;
     padding: 3px;
@@ -194,9 +194,9 @@
   /* ── LCD segment display ─────────────────────────────────────────────────── */
   .lcd-display {
     font-family: 'Share Tech Mono', monospace;
-    background: #0a120a;
+    background: #141e14;
     color: #a0f0a0;
-    border: 1px solid #1a2a1a;
+    border: 1px solid #243424;
     border-radius: 4px;
     padding: 4px 12px;
     box-shadow:
@@ -300,8 +300,8 @@
   /* ── AI Panel ────────────────────────────────────────────────────────────── */
   .ai-panel {
     background: linear-gradient(180deg,
-      rgba(15, 17, 20, 0.98) 0%,
-      rgba(10, 12, 15, 0.99) 100%
+      rgba(24, 27, 36, 0.98) 0%,
+      rgba(20, 22, 30, 0.99) 100%
     );
     backdrop-filter: blur(16px);
     position: relative;
@@ -368,7 +368,7 @@
   .led-md { width: 8px; height: 8px; }
 
   .led-off {
-    background: #1a1d2a;
+    background: #252838;
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
   }
 
@@ -428,7 +428,7 @@
   /* ── Fader track ─────────────────────────────────────────────────────────── */
   .fader-track {
     position: relative;
-    background: linear-gradient(180deg, #0a0c12 0%, #141824 100%);
+    background: linear-gradient(180deg, #161922 0%, #1e2230 100%);
     border-radius: 4px;
     box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.3);
     overflow: hidden;
@@ -500,8 +500,8 @@
   /* ── Embossed button (mute/solo/arm) ─────────────────────────────────────── */
   .hw-btn {
     @apply flex items-center justify-center rounded text-2xs font-bold transition-all cursor-pointer select-none;
-    background: linear-gradient(180deg, #1e2130 0%, #161921 100%);
-    border: 1px solid rgba(255, 255, 255, 0.04);
+    background: linear-gradient(180deg, #282c3a 0%, #21252f 100%);
+    border: 1px solid rgba(255, 255, 255, 0.05);
     color: #4a5068;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.03);
   }
@@ -548,29 +548,29 @@
 
   /* ── Mixer panel header ──────────────────────────────────────────────────── */
   .mixer-header {
-    background: linear-gradient(180deg, #12151e 0%, #0d1018 100%);
-    border-bottom: 1px solid #1f2233;
+    background: linear-gradient(180deg, #1e2230 0%, #191c28 100%);
+    border-bottom: 1px solid #2a2e40;
   }
 
   /* ── Channel strip ───────────────────────────────────────────────────────── */
   .channel-strip {
-    background: linear-gradient(180deg, #111420 0%, #0d1018 100%);
-    border-right: 1px solid #1a1d2a;
+    background: linear-gradient(180deg, #1c2030 0%, #191c28 100%);
+    border-right: 1px solid #252838;
     transition: background 0.15s ease;
   }
 
   .channel-strip:hover {
-    background: linear-gradient(180deg, #141824 0%, #101420 100%);
+    background: linear-gradient(180deg, #1e2230 0%, #1a1e2c 100%);
   }
 
   .channel-strip.selected {
-    background: linear-gradient(180deg, #161a28 0%, #121620 100%);
+    background: linear-gradient(180deg, #212536 0%, #1c2030 100%);
   }
 
   /* ── Animated gradient border (for AI suggestion cards) ──────────────────── */
   .gradient-border {
     position: relative;
-    background: #0f1114;
+    background: #1a1d28;
     border-radius: 8px;
   }
 

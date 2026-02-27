@@ -47,8 +47,8 @@ function drawRuler(
 ) {
   // Gradient background
   const grad = ctx.createLinearGradient(0, 0, 0, HEADER_HEIGHT)
-  grad.addColorStop(0, '#12151e')
-  grad.addColorStop(1, '#0d1018')
+  grad.addColorStop(0, '#1e2230')
+  grad.addColorStop(1, '#191c28')
   ctx.fillStyle = grad
   ctx.fillRect(0, 0, width, HEADER_HEIGHT)
 
@@ -136,13 +136,13 @@ function drawGrid(
     const y = HEADER_HEIGHT + i * (TRACK_HEIGHT + TRACK_GAP)
     const grad = ctx.createLinearGradient(0, y, 0, y + TRACK_HEIGHT)
     if (i % 2 === 0) {
-      grad.addColorStop(0, '#161921')
-      grad.addColorStop(0.05, '#141824')
-      grad.addColorStop(1, '#121620')
+      grad.addColorStop(0, '#21252f')
+      grad.addColorStop(0.05, '#1e2230')
+      grad.addColorStop(1, '#1c2028')
     } else {
-      grad.addColorStop(0, '#141820')
-      grad.addColorStop(0.05, '#12161e')
-      grad.addColorStop(1, '#101420')
+      grad.addColorStop(0, '#1e2230')
+      grad.addColorStop(0.05, '#1c2028')
+      grad.addColorStop(1, '#1a1e2c')
     }
     ctx.fillStyle = grad
     ctx.fillRect(0, y, width, TRACK_HEIGHT)
@@ -485,7 +485,7 @@ export function ArrangementView() {
     ctx.clearRect(0, 0, w, h)
 
     // Background
-    ctx.fillStyle = '#08090b'
+    ctx.fillStyle = '#141620'
     ctx.fillRect(0, 0, w, h)
 
     drawRuler(ctx, w, pixelsPerBeat, scrollLeft, transport.loopEnabled, transport.loopStart ?? 0, transport.loopEnd ?? 16)
@@ -573,7 +573,7 @@ export function ArrangementView() {
   }, [hitTest])
 
   return (
-    <div ref={containerRef} className="relative flex-1 overflow-hidden" style={{ background: '#08090b' }}>
+    <div ref={containerRef} className="relative flex-1 overflow-hidden" style={{ background: '#141620' }}>
       <canvas
         ref={canvasRef}
         className="absolute inset-0 cursor-crosshair"

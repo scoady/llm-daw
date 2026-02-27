@@ -20,7 +20,7 @@ function GradientMesh() {
   return (
     <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0 }}>
       {/* Base dark */}
-      <div className="absolute inset-0" style={{ background: '#060810' }} />
+      <div className="absolute inset-0" style={{ background: '#101218' }} />
 
       {/* Animated gradient blobs */}
       <div
@@ -130,7 +130,7 @@ export function HomePage() {
       <header
         className="relative flex items-center justify-between px-8 py-4 border-b border-border-subtle/50"
         style={{
-          background: 'linear-gradient(180deg, rgba(14, 16, 24, 0.9) 0%, rgba(10, 12, 18, 0.8) 100%)',
+          background: 'linear-gradient(180deg, rgba(22, 24, 34, 0.9) 0%, rgba(18, 20, 28, 0.8) 100%)',
           backdropFilter: 'blur(12px)',
           zIndex: 10,
         }}
@@ -295,7 +295,7 @@ export function HomePage() {
       <div
         className="relative flex items-center justify-center px-6 py-2 border-t border-border-subtle/30"
         style={{
-          background: 'linear-gradient(180deg, rgba(10, 12, 18, 0.9) 0%, rgba(8, 9, 11, 0.95) 100%)',
+          background: 'linear-gradient(180deg, rgba(18, 20, 28, 0.9) 0%, rgba(14, 16, 22, 0.95) 100%)',
           backdropFilter: 'blur(8px)',
           zIndex: 10,
         }}

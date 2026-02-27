@@ -72,8 +72,8 @@ export function ClipContextMenu({ clip, track, x, y, onClose }: ClipContextMenuP
     left: Math.min(x, window.innerWidth - 200),
     top: Math.min(y, window.innerHeight - 140),
     zIndex: 200,
-    background: 'linear-gradient(180deg, #111420 0%, #0f1114 100%)',
-    border: '1px solid #2d3348',
+    background: 'linear-gradient(180deg, #1c2030 0%, #1a1d28 100%)',
+    border: '1px solid #363c52',
     boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
   }
 

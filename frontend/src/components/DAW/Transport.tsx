@@ -1,4 +1,5 @@
 import { useCallback, useState, useRef, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Play, Pause, Square, Circle,
   SkipBack, Repeat,
@@ -140,10 +141,10 @@ export function Transport() {
 
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 select-none transport-bar scan-line-overlay">
-      {/* Logo */}
-      <div className="flex items-center gap-1.5 mr-1">
+      {/* Logo — home link */}
+      <Link to="/" className="flex items-center gap-1.5 mr-1 hover:opacity-80 transition-opacity" title="Home">
         <LogoIcon size={28} color="#6c63ff" glow glowColor="rgba(108,99,255,0.4)" />
-      </div>
+      </Link>
 
       {/* Hardware groove */}
       <div className="hardware-groove" />
@@ -232,7 +233,7 @@ export function Transport() {
         {quantizeOpen && (
           <div
             className="absolute top-full left-0 mt-1 rounded-lg shadow-panel-raised z-50 overflow-hidden py-1"
-            style={{ background: 'linear-gradient(180deg, #111420 0%, #0f1114 100%)', border: '1px solid #2d3348' }}
+            style={{ background: 'linear-gradient(180deg, #1c2030 0%, #1a1d28 100%)', border: '1px solid #363c52' }}
           >
             {([
               { label: '1/4', value: 1 },

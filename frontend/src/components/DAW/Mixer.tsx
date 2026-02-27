@@ -139,7 +139,7 @@ function MasterStrip() {
       className="flex flex-col items-center gap-1 px-2 py-1.5 border-r-2 border-border-strong"
       style={{
         width: 88,
-        background: 'linear-gradient(180deg, #12151e 0%, #0d1018 100%)',
+        background: 'linear-gradient(180deg, #1e2230 0%, #191c28 100%)',
       }}
     >
       {/* Label */}
