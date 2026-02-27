@@ -82,7 +82,9 @@ export function Slider({
           className="absolute top-0 left-0 bottom-0 rounded-l-[3px]"
           style={{
             width: `${percent}%`,
-            background: `linear-gradient(90deg, ${defaultFill} 0%, rgba(108,99,255,0.8) 100%)`,
+            background: fillColor
+              ? `linear-gradient(90deg, ${defaultFill} 0%, ${fillColor} 100%)`
+              : `linear-gradient(90deg, ${defaultFill} 0%, rgba(108,99,255,0.8) 100%)`,
             boxShadow: `0 0 6px ${defaultFill}`,
           }}
         />
